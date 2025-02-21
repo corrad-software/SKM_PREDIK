@@ -2,7 +2,28 @@
   "menu": [
     {
       "type": "section",
-      "title": "SUPER ADMINISTRATOR",
+      "title": "Ahli Koperasi",
+      "items": [
+        {
+          "name": "Muat Naik & Semakan",
+          "icon": "ic:sharp-upload-file",
+          "path": "/ahli-kooperasi/upload"
+        },
+        {
+          "name": "Paparan Indeks",
+          "icon": "ant-design:node-index-outlined",
+          "path": "/ahli-kooperasi/index-review"
+        },
+        {
+          "name": "Paparan Lejar",
+          "icon": "fluent-emoji-high-contrast:ledger",
+          "path": "/ahli-kooperasi/ledger-review"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Auditor SKM",
       "items": [
         {
           "name": "Repositori",
@@ -17,69 +38,7 @@
               "path": "/repository/document-tray"
             }
           ]
-        },
-        {
-          "name": "Pengesahan",
-          "icon": "material-symbols:approval-delegation-rounded", 
-          "children": [
-            {
-              "name": "Permohonan PAP",
-              "path": "/repository/approval/borang-permohonan"
-            },
-            {
-              "name": "Senarai Permohonan",
-              "path": "/repository/approval/senarai-permohonan"
-            },
-            {
-              "name": "Senarai Pengesahan",
-              "path": "/repository/approval/senarai-pengesahan"
-            }
-          ]
         }
-      ]
-    },
-    {
-      "type": "section",
-      "title": "Settings",
-      "items": [
-        {
-          "name": "General Settings",
-          "icon": "lucide:settings",
-          "children": [
-            {
-              "name": "Profile",
-              "path": "/admin/settings/general/profile",
-              "icon": "ph:user"
-            },
-            {
-              "name": "Security",
-              "path": "/admin/settings/general/security",
-              "icon": "ph:lock"
-            }
-          ]
-        },
-        {
-          "name": "Access Controls",
-          "icon": "uis:lock-access",
-          "children": [
-            {
-              "name": "Archive Rooms",
-              "path": "/admin/settings/access-control/archive-rooms",
-              "icon": "mdi:archive-edit"
-            },
-            {
-              "name": "Cabinet",
-              "path": "/admin/settings/access-control/cabinet",
-              "icon": "mdi:file-cabinet"
-            },
-            {
-              "name": "Group Management",
-              "path": "/admin/settings/access-control/group-management",
-              "icon": "material-symbols:groups"
-            }
-          ]
-        }
-
       ]
     }
   ]

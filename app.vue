@@ -1,7 +1,7 @@
 <script setup>
 useSeoMeta({
-  title: "ECOMS JKR V2",
-  description: "Modern UI components for ECOMS JKR V2",
+  title: "PRIDIK",
+  description: "Modern UI components for PRIDIK",
 });
 </script>
 

@@ -202,7 +202,7 @@ const dropdownPosition = computed(() => {
       >
         <NuxtLink to="/admin" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <img
-            src="\assets\image\jkr_logo.png"
+            src="\assets\image\skm-logo.png"
             alt="Logo"
             class="w-12 h-8 rounded-md"
           />
@@ -214,9 +214,9 @@ const dropdownPosition = computed(() => {
               transform: effectiveIsMinimized ? 'translateX(-10px)' : 'translateX(0)'
             }"
           >
-            <h2 class="text-sm font-semibold whitespace-nowrap">ECOMS_V2</h2>
+            <h2 class="text-sm font-semibold whitespace-nowrap">PRIDIK</h2>
             <p class="text-xs text-muted-foreground whitespace-nowrap">
-              Jabatan Kerja Raya
+              Suruhanjaya Koperasi Malaysia
             </p>
           </div>
         </NuxtLink>
