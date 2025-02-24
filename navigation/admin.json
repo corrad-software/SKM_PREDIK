@@ -31,18 +31,14 @@
       "title": "Auditor SKM",
       "items": [
         {
-          "name": "Repositori",
-          "icon": "mdi:source-repository", 
-          "children": [
-            {
-              "name": "Carian Dokumen",
-              "path": "/repository/document-explorer"
-            },
-            {
-              "name": "Document Tray",
-              "path": "/repository/document-tray"
-            }
-          ]
+          "name": "Paparan Indeks",
+          "icon": "ant-design:node-index-outlined",
+          "path": "/ahli-kooperasi/index-review"
+        },
+        {
+          "name": "Paparan Lejar",
+          "icon": "fluent-emoji-high-contrast:ledger",
+          "path": "/ahli-kooperasi/ledger-review"
         }
       ]
     }
