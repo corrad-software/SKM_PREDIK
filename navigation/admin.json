@@ -5,6 +5,11 @@
       "title": "Ahli Koperasi",
       "items": [
         {
+          "name": "Pengurusan Entiti",
+          "icon": "hugeicons:structure-05",
+          "path": "/ahli-kooperasi/entity-management"
+        },
+        {
           "name": "Muat Naik & Semakan",
           "icon": "ic:sharp-upload-file",
           "path": "/ahli-kooperasi/upload"

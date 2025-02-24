@@ -87,10 +87,167 @@ const addNewRow = () => {
 
   ledgerData.value.rows.push(newRow);
 };
+
+// Add reactive data for risk assessment
+const riskAssessment = ref({
+  overallRisk: 'MEDIUM',
+  categories: [
+    {
+      name: 'Financial Risk',
+      level: 'HIGH',
+      status: 'NEED ATTENTION',
+      description: 'High debt-to-equity ratio and declining liquidity metrics',
+      recommendations: [
+        'Review current debt structure',
+        'Implement stricter cash flow management',
+        'Consider debt consolidation options'
+      ],
+      isOpen: false
+    },
+    {
+      name: 'Operational Risk',
+      level: 'LOW',
+      status: 'ACCEPTABLE',
+      description: 'Strong internal controls and documented procedures',
+      recommendations: [
+        'Continue monitoring operational metrics',
+        'Regular staff training updates'
+      ],
+      isOpen: false
+    },
+    {
+      name: 'Compliance Risk',
+      level: 'MEDIUM',
+      status: 'MONITORING',
+      description: 'Recent regulatory changes require attention',
+      recommendations: [
+        'Update compliance documentation',
+        'Schedule regulatory review meeting'
+      ],
+      isOpen: false
+    }
+  ]
+});
+
+// Toggle category expansion
+const toggleCategory = (category) => {
+  category.isOpen = !category.isOpen;
+};
+
+// Add state for panel visibility
+const isRiskPanelOpen = ref(false);
+
+const toggleRiskPanel = () => {
+  isRiskPanelOpen.value = !isRiskPanelOpen.value;
+};
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Add toggle button in the main content -->
+    <div class="fixed top-20 right-4 z-10">
+      <button @click="toggleRiskPanel" 
+              class="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-50 transition-colors duration-200">
+        <span class="sr-only">Toggle Risk Assessment</span>
+        <Icon name="material-symbols:planner-review" class="w-6 h-6" />
+      </button>
+    </div>
+
+    <!-- Slide-out Risk Assessment Panel -->
+    <div class="fixed inset-y-0 right-0 w-96 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50"
+         :class="isRiskPanelOpen ? 'translate-x-0' : 'translate-x-full'">
+      <!-- Panel Header -->
+      <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+        <h2 class="text-lg font-semibold">Risk Assessment Review</h2>
+        <button @click="toggleRiskPanel" class="p-2 hover:bg-gray-200 rounded-full">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="p-4 overflow-y-auto h-full pb-20">
+        <!-- Overall Risk Level -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between">
+            <span class="text-gray-600">Overall Risk Level:</span>
+            <span :class="[
+              'px-3 py-1 rounded-full text-white font-medium text-sm',
+              riskAssessment.overallRisk === 'HIGH' ? 'bg-red-500' : '',
+              riskAssessment.overallRisk === 'MEDIUM' ? 'bg-yellow-500' : '',
+              riskAssessment.overallRisk === 'LOW' ? 'bg-green-500' : ''
+            ]">
+              {{ riskAssessment.overallRisk }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Risk Categories -->
+        <div class="space-y-4">
+          <div v-for="category in riskAssessment.categories" 
+               :key="category.name" 
+               class="border rounded-lg">
+            <div @click="toggleCategory(category)"
+                 class="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+              <div class="flex flex-col space-y-2">
+                <span class="font-medium">{{ category.name }}</span>
+                <div class="flex space-x-2">
+                  <span :class="[
+                    'px-2 py-1 rounded-full text-white text-sm',
+                    category.level === 'HIGH' ? 'bg-red-500' : '',
+                    category.level === 'MEDIUM' ? 'bg-yellow-500' : '',
+                    category.level === 'LOW' ? 'bg-green-500' : ''
+                  ]">
+                    {{ category.level }}
+                  </span>
+                  <span :class="[
+                    'px-2 py-1 rounded-full text-sm',
+                    category.status === 'NEED ATTENTION' ? 'bg-red-100 text-red-800' : '',
+                    category.status === 'MONITORING' ? 'bg-yellow-100 text-yellow-800' : '',
+                    category.status === 'ACCEPTABLE' ? 'bg-green-100 text-green-800' : ''
+                  ]">
+                    {{ category.status }}
+                  </span>
+                </div>
+              </div>
+              <svg class="w-5 h-5 transform transition-transform" 
+                   :class="{ 'rotate-180': category.isOpen }"
+                   fill="none" 
+                   stroke="currentColor" 
+                   viewBox="0 0 24 24">
+                <path stroke-linecap="round" 
+                      stroke-linejoin="round" 
+                      stroke-width="2" 
+                      d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            
+            <div v-show="category.isOpen" 
+                 class="p-3 border-t bg-gray-50">
+              <p class="text-gray-600 mb-2">{{ category.description }}</p>
+              <div class="mt-2">
+                <h4 class="font-medium mb-1">Recommendations:</h4>
+                <ul class="list-disc list-inside text-gray-600">
+                  <li v-for="rec in category.recommendations" 
+                      :key="rec" 
+                      class="ml-2">
+                    {{ rec }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backdrop -->
+    <div v-if="isRiskPanelOpen" 
+         @click="toggleRiskPanel"
+         class="fixed inset-0 bg-black bg-opacity-25 transition-opacity duration-300 ease-in-out z-40">
+    </div>
+
     <div class="max-w-full mx-auto p-4">
       <!-- Header -->
       <div class="bg-white rounded-lg shadow mb-4">
@@ -257,6 +414,35 @@ input:hover {
 /* Add transition for smoother highlighting */
 td {
   transition: background-color 0.2s ease;
+}
+
+/* Add smooth transitions for risk assessment panels */
+.transform {
+  transition: all 0.2s ease;
+}
+
+/* Add styles for the slide-out panel */
+.h-full {
+  height: calc(100vh - 4rem);
+}
+
+/* Ensure the panel scrolls properly */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E0 #EDF2F7;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #EDF2F7;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: #CBD5E0;
+  border-radius: 4px;
 }
 </style>
 
