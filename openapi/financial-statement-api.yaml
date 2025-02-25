@@ -1,0 +1,810 @@
+openapi: 3.0.0
+info:
+  title: SKM API Documentation
+  version: 1.0.0
+  description: |
+    API documentation for SKM (Sistem Kewangan Management) including financial statements, 
+    organization management, and related functionalities.
+
+servers:
+  - url: /api
+    description: Local development server
+
+components:
+  schemas:
+    FinancialStatement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pengecam unik untuk penyata kewangan (Unique identifier for the financial statement)
+        file_name:
+          type: string
+          description: Nama fail yang dimuat naik (Name of the uploaded file)
+        file_path:
+          type: string
+          description: Laluan fail dalam storan (Path to the file in storage)
+        file_url:
+          type: string
+          description: URL awam untuk mengakses fail (Public URL to access the file)
+        statement_type:
+          type: string
+          enum: [kunci_kira_kira, imbangan_duga, ledger, bank_reconciliation]
+          description: Jenis penyata kewangan (Type of financial statement)
+        status:
+          type: string
+          enum: [draft, confirmed, deleted]
+          description: Status semasa penyata (Current status of the statement)
+        created_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa penciptaan (Creation timestamp)
+        updated_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa kemaskini terakhir (Last update timestamp)
+        analysis_result:
+          $ref: '#/components/schemas/AnalysisResult'
+        entries:
+          type: array
+          description: Entri penyata kewangan (Financial statement entries)
+          items:
+            $ref: '#/components/schemas/FinancialEntry'
+        reference_files:
+          type: array
+          description: Fail rujukan yang berkaitan (Associated reference files)
+          items:
+            $ref: '#/components/schemas/ReferenceFile'
+
+    AnalysisResult:
+      type: object
+      description: Keputusan analisis AI (AI analysis results)
+      properties:
+        total_major_issues:
+          type: integer
+          description: Jumlah isu-isu major
+        total_minor_issues:
+          type: integer
+          description: Jumlah isu-isu minor
+        total_ralat_dokumen:
+          type: integer
+          description: Jumlah ralat dokumen
+        sections_requiring_revisions:
+          type: string
+          description: Senarai bahagian yang memerlukan semakan
+        detailed_analysis:
+          type: object
+          properties:
+            major_issues:
+              type: array
+              items:
+                type: string
+            minor_issues:
+              type: array
+              items:
+                type: string
+            document_errors:
+              type: array
+              items:
+                type: string
+            section_revisions:
+              type: object
+              additionalProperties:
+                type: string
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pengecam unik untuk organisasi
+        name:
+          type: string
+          description: Nama organisasi
+        description:
+          type: string
+          nullable: true
+          description: Penerangan organisasi
+        bank_account:
+          type: string
+          nullable: true
+          description: Nombor akaun bank
+        organization_type:
+          type: string
+          enum: [parent, child]
+          description: Jenis organisasi
+        status:
+          type: string
+          enum: [active, inactive, deleted]
+          description: Status organisasi
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ReferenceFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pengecam unik untuk fail rujukan (Unique identifier for reference file)
+        statement_id:
+          type: string
+          format: uuid
+          description: ID penyata kewangan yang berkaitan (Associated financial statement ID)
+        file_name:
+          type: string
+          description: Nama fail rujukan (Reference file name)
+        file_path:
+          type: string
+          description: Laluan fail dalam storan (Path in storage)
+        file_url:
+          type: string
+          description: URL awam untuk mengakses fail (Public URL to access the file)
+        created_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa penciptaan (Creation timestamp)
+        updated_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa kemaskini terakhir (Last update timestamp)
+
+    FinancialEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        statement_id:
+          type: string
+          format: uuid
+        section:
+          type: string
+        label:
+          type: string
+        amount:
+          type: number
+          format: float
+          nullable: true
+        is_total:
+          type: boolean
+        parent_section:
+          type: string
+          nullable: true
+        sort_order:
+          type: integer
+
+    StatementGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pengecam unik untuk kumpulan penyata (Unique identifier for statement group)
+        name:
+          type: string
+          description: Nama kumpulan (Group name)
+        description:
+          type: string
+          nullable: true
+          description: Penerangan kumpulan (Group description)
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID pengguna yang memiliki kumpulan ini (ID of user who owns this group)
+        created_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa penciptaan (Creation timestamp)
+        updated_at:
+          type: string
+          format: date-time
+          description: Tarikh dan masa kemaskini terakhir (Last update timestamp)
+        statements:
+          type: object
+          description: Penyata kewangan dalam kumpulan, diindeks mengikut jenis (Financial statements in the group, indexed by type)
+          properties:
+            kunci_kira_kira:
+              $ref: '#/components/schemas/FinancialStatement'
+            imbangan_duga:
+              $ref: '#/components/schemas/FinancialStatement'
+            ledger:
+              $ref: '#/components/schemas/FinancialStatement'
+            bank_reconciliation:
+              $ref: '#/components/schemas/FinancialStatement'
+
+paths:
+  /organization/create:
+    post:
+      summary: Create a new organization
+      description: Creates a new organization with optional parent-child relationship
+      tags:
+        - Organizations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Organization name
+                description:
+                  type: string
+                  description: Organization description
+                bank_account:
+                  type: string
+                  description: Bank account number
+                parent_id:
+                  type: string
+                  format: uuid
+                  description: Parent organization ID (if creating a child organization)
+      responses:
+        '200':
+          description: Organization created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/Organization'
+
+  /organization/{id}:
+    get:
+      summary: Get organization details
+      description: Retrieves details of a specific organizations
+      tags:
+        - Organizations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Organization details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/Organization'
+    delete:
+      summary: Delete organization
+      description: Deletes a specific organization
+      tags:
+        - Organizations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Organization deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+
+  /organization/list:
+    get:
+      summary: List organizations
+      description: Retrieves a list of all organizations
+      tags:
+        - Organizations
+      responses:
+        '200':
+          description: Organizations retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+
+  /financial-statement/analyze:
+    post:
+      summary: Analyze financial statement
+      description: Performs AI-powered analysis of financial statements
+      tags:
+        - Financial Statements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - statement_id
+              properties:
+                statement_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/AnalysisResult'
+
+  /financial-statement/generate-ledger:
+    post:
+      summary: Generate ledger
+      description: Generates ledger entries from financial statement data
+      tags:
+        - Financial Statements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - statement_id
+              properties:
+                statement_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Ledger generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: object
+                    properties:
+                      job_id:
+                        type: string
+                        format: uuid
+
+  /financial-statement/check-ledger-status:
+    post:
+      summary: Check ledger generation status
+      description: Checks the status of a ledger generation job
+      tags:
+        - Financial Statements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - job_id
+              properties:
+                job_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [pending, processing, completed, failed]
+                      progress:
+                        type: number
+                        format: float
+                        description: Progress percentage (0-100)
+
+  /financial-statement/upload:
+    post:
+      summary: Upload financial statement
+      description: Upload a new financial statement file
+      tags:
+        - Financial Statements
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - statement_file
+              properties:
+                statement_file:
+                  type: string
+                  format: binary
+                  description: Financial statement file (.xlsx, .xls)
+                reference_file:
+                  type: string
+                  format: binary
+                  description: Reference file (optional)
+                statement_type:
+                  type: string
+                  enum: [kunci_kira_kira, imbangan_duga, ledger, bank_reconciliation]
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/FinancialStatement'
+
+  /financial-statement/clear:
+    delete:
+      summary: Clear all financial statements
+      description: Deletes all financial statements (use with caution)
+      tags:
+        - Financial Statements
+      responses:
+        '200':
+          description: All statements cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+
+  /financial-statement/{id}:
+    get:
+      summary: Get financial statement
+      description: Retrieves a specific financial statement
+      tags:
+        - Financial Statements
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statement retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/FinancialStatement'
+    delete:
+      summary: Delete financial statement
+      description: Deletes a specific financial statement
+      tags:
+        - Financial Statements
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statement deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+
+  /financial-statement/group/create:
+    post:
+      summary: Cipta kumpulan penyata kewangan (Create financial statement group)
+      description: Cipta kumpulan baru untuk menghubungkan beberapa penyata kewangan (Create a new group to link multiple financial statements)
+      tags:
+        - Statement Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - statements
+              properties:
+                name:
+                  type: string
+                  description: Nama untuk kumpulan (Name for the group)
+                description:
+                  type: string
+                  description: Penerangan kumpulan (Description of the group)
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID pengguna yang memiliki kumpulan (ID of user who owns the group)
+                statements:
+                  type: array
+                  description: Senarai penyata untuk dikumpulkan (List of statements to group)
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - statement_id
+                      - type
+                    properties:
+                      statement_id:
+                        type: string
+                        format: uuid
+                        description: ID penyata kewangan (Financial statement ID)
+                      type:
+                        type: string
+                        enum: [kunci_kira_kira, imbangan_duga, ledger, bank_reconciliation]
+                        description: Jenis penyata kewangan (Type of financial statement)
+      responses:
+        '200':
+          description: Kumpulan berjaya dicipta (Group successfully created)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      user_id:
+                        type: string
+                        format: uuid
+                      created_at:
+                        type: string
+                        format: date-time
+                      statements_count:
+                        type: integer
+        '400':
+          description: Permintaan tidak sah (Invalid request)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [error]
+                  message:
+                    type: string
+        '500':
+          description: Ralat pelayan (Server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [error]
+                  message:
+                    type: string
+
+  /financial-statement/group/{id}:
+    get:
+      summary: Dapatkan butiran kumpulan penyata (Get statement group details)
+      description: Dapatkan butiran kumpulan penyata kewangan termasuk semua penyata yang berkaitan (Get details of a statement group including all associated statements)
+      tags:
+        - Statement Groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID kumpulan untuk diambil (Group ID to retrieve)
+      responses:
+        '200':
+          description: Butiran kumpulan (Group details)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    $ref: '#/components/schemas/StatementGroup'
+        '404':
+          description: Kumpulan tidak dijumpai (Group not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [error]
+                  message:
+                    type: string
+        '500':
+          description: Ralat pelayan (Server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [error]
+                  message:
+                    type: string
+
+  /financial-statement/group/list:
+    get:
+      summary: Senarai semua kumpulan penyata (List all statement groups)
+      description: Dapatkan senarai semua kumpulan penyata kewangan dengan ringkasan statistik (Get a list of all statement groups with summary statistics)
+      tags:
+        - Statement Groups
+      responses:
+        '200':
+          description: Senarai kumpulan berjaya diambil (Successfully retrieved groups list)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: object
+                    required:
+                      - total_groups
+                      - groups
+                    properties:
+                      total_groups:
+                        type: integer
+                        description: Jumlah kumpulan yang dijumpai (Total number of groups found)
+                      groups:
+                        type: array
+                        description: Senarai kumpulan dengan statistik (List of groups with statistics)
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - name
+                            - created_at
+                            - updated_at
+                            - statements
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              description: ID kumpulan (Group ID)
+                            name:
+                              type: string
+                              description: Nama kumpulan (Group name)
+                            description:
+                              type: string
+                              nullable: true
+                              description: Penerangan kumpulan (Group description)
+                            created_at:
+                              type: string
+                              format: date-time
+                              description: Tarikh dan masa penciptaan (Creation timestamp)
+                            updated_at:
+                              type: string
+                              format: date-time
+                              description: Tarikh dan masa kemaskini terakhir (Last update timestamp)
+                            statements:
+                              type: object
+                              required:
+                                - total
+                                - by_type
+                                - by_status
+                                - has_issues
+                              properties:
+                                total:
+                                  type: integer
+                                  description: Jumlah penyata dalam kumpulan (Total statements in group)
+                                by_type:
+                                  type: object
+                                  description: Bilangan penyata mengikut jenis (Statement count by type)
+                                  additionalProperties:
+                                    type: integer
+                                by_status:
+                                  type: object
+                                  description: Bilangan penyata mengikut status (Statement count by status)
+                                  additionalProperties:
+                                    type: integer
+                                has_issues:
+                                  type: boolean
+                                  description: Penunjuk jika ada isu dalam mana-mana penyata (Indicator if any statements have issues)
+                                issues:
+                                  type: object
+                                  description: Ringkasan isu-isu jika ada (Summary of issues if any exist)
+                                  required:
+                                    - total_major_issues
+                                    - total_minor_issues
+                                  properties:
+                                    total_major_issues:
+                                      type: integer
+                                      description: Jumlah isu-isu major dalam semua penyata (Total major issues across all statements)
+                                    total_minor_issues:
+                                      type: integer
+                                      description: Jumlah isu-isu minor dalam semua penyata (Total minor issues across all statements)
+        '500':
+          description: Ralat pelayan (Server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [error]
+                  message:
+                    type: string
+                    description: Penerangan ralat (Error description) 

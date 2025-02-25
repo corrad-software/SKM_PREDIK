@@ -1,0 +1,130 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm build
+        env:
+          PORT: 3000
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          SUPABASE_DATABASE_PASSWORD: ${{ secrets.SUPABASE_DATABASE_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Initial EC2 Setup
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Install NVM
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+            
+            # Load NVM
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Install Node.js
+            nvm install 22
+            nvm use 22
+            
+            # Verify installations
+            node --version
+            npm --version
+            
+            # Install pnpm and PM2 globally
+            npm install -g pnpm@8
+            npm install -g pm2
+            
+            # Create and setup project directory
+            sudo mkdir -p /home/skm
+            cd /home/skm
+            
+            # Fix permissions
+            sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /home/skm
+            sudo chmod -R 755 /home/skm
+            
+            # Stop existing PM2 processes if any
+            pm2 stop app || true
+            pm2 delete app || true
+
+      - name: Copy built files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: ".output/,package.json"
+          target: "/home/skm"
+          strip_components: 0
+
+      - name: Final EC2 Setup and Start
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Load NVM and Node.js environment
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 22
+            
+            cd /home/skm
+            
+            # Fix permissions again after file copy
+            sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /home/skm
+            sudo chmod -R 755 /home/skm
+            
+            # Create .env file
+            sudo tee .env > /dev/null << EOL
+            PORT=3000
+            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_KEY }}"
+            SUPABASE_JWT_SECRET="${{ secrets.SUPABASE_JWT_SECRET }}"
+            SUPABASE_DATABASE_PASSWORD="${{ secrets.SUPABASE_DATABASE_PASSWORD }}"
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+            EOL
+            
+            sudo chown ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} .env
+            sudo chmod 644 .env
+            
+            # Reinstall global packages to ensure they're available
+            npm install -g pnpm@8
+            npm install -g pm2
+            
+            # Install dependencies and start the application
+            pnpm install
+            
+            # Start the application with full path to pnpm
+            pm2 start "pnpm preview" --name app
+            pm2 save
