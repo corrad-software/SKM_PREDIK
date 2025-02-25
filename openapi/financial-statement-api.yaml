@@ -266,7 +266,7 @@ paths:
   /organization/{id}:
     get:
       summary: Get organization details
-      description: Retrieves details of a specific organization
+      description: Retrieves details of a specific organizations
       tags:
         - Organizations
       parameters:
