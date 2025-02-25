@@ -3,8 +3,38 @@ definePageMeta({
   layout: "admin",
 });
 
+import { ref, onMounted, computed } from 'vue'
+
+const route = useRoute()
 const sections = ref(['Butiran Koperasi', 'Kunci Kira Kira', 'Imbangan Duga', 'Ledger', 'Bank Reconciliation', 'Overall Review']);
 const currentSection = ref(0);
+
+// Get subsidiary parameters from route
+const isSubsidiary = computed(() => route.query.isSubsidiary === '1')
+const subsidiaryIndex = computed(() => {
+  const index = parseInt(route.query.subsidiaryIndex)
+  return !isNaN(index) ? index : null
+})
+
+// Function to set initial section based on URL parameter
+const initializeSection = () => {
+  const sectionParam = parseInt(route.query.section)
+  if (!isNaN(sectionParam) && sectionParam >= 0 && sectionParam < sections.value.length) {
+    currentSection.value = sectionParam
+  }
+}
+
+// Update page title based on whether we're uploading for subsidiary
+const pageTitle = computed(() => {
+  return isSubsidiary.value 
+    ? `Muat Naik Dokumen Audit - Anak Syarikat ${subsidiaryIndex.value + 1}`
+    : 'Muat Naik Dokumen Audit'
+})
+
+// Initialize section on component mount
+onMounted(() => {
+  initializeSection()
+})
 
 const nextSection = () => {
   if (currentSection.value < sections.value.length - 1) {
@@ -161,7 +191,7 @@ const reviewersList = ref([
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold">Muat Naik Dokumen Audit</h1>
+      <h1 class="text-2xl font-semibold">{{ pageTitle }}</h1>
     </div>
 
     <!-- Section Indicator -->

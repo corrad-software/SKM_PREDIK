@@ -21,7 +21,7 @@
           <h2 class="text-2xl font-semibold text-gray-800">Maklumat Koperasi</h2>
         </div>
       
-        <div class="grid grid-cols-2 gap-8">
+        <div class="grid grid-cols-2 gap-8 mb-6">
           <div>
             <label class="block text-sm font-medium text-gray-600 mb-2 flex items-center">
               <Icon name="streamline:business-profession-home-office" class="w-4 h-4 mr-2 text-gray-400" />
@@ -46,6 +46,50 @@
               class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" 
               placeholder="Masukkan nombor akaun bank"
             />
+          </div>
+        </div>
+
+        <!-- Document Upload Section -->
+        <div>
+          <div class="flex items-center mb-4">
+            <Icon name="material-symbols:description" class="w-4 h-4 mr-2 text-gray-400" />
+            <span class="text-sm font-medium text-gray-600">Dokumen Diperlukan</span>
+          </div>
+          <div class="space-y-2">
+            <div v-for="docType in documentTypes" :key="docType.id" 
+                 class="flex items-center bg-gray-50 p-2 rounded-lg">
+              <input 
+                type="checkbox" 
+                :checked="!!parentCompany.files.find(f => f.type === docType.id)"
+                class="h-4 w-4 text-blue-500 rounded border-gray-300 mr-3"
+                disabled
+              />
+              <span class="text-sm text-gray-700 mr-3">{{ docType.name }}</span>
+              
+              <!-- If file is uploaded -->
+              <div v-if="parentCompany.files.find(f => f.type === docType.id)" 
+                   class="ml-auto flex items-center">
+                <span class="text-xs text-gray-500 mr-3">
+                  {{ parentCompany.files.find(f => f.type === docType.id).name }}
+                </span>
+                <button 
+                  @click="removeParentFile(docType.id)"
+                  class="text-red-500 hover:text-red-600 text-sm"
+                >
+                  <Icon name="material-symbols:delete" class="w-4 h-4" />
+                </button>
+              </div>
+              
+              <!-- If no file uploaded -->
+              <button 
+                v-else
+                @click="navigateToUpload(docType.id)" 
+                class="text-blue-500 hover:text-blue-600 text-sm ml-auto flex items-center"
+              >
+                <Icon name="material-symbols:upload" class="w-4 h-4 mr-1" />
+                Muat Naik
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -135,27 +179,41 @@
               </td>
               <td class="px-8 py-4">
                 <div class="space-y-3">
-                  <div v-for="docType in documentTypes" :key="docType.id" 
-                       class="flex items-center bg-gray-50 p-2 rounded-lg">
-                    <input 
-                      type="checkbox" 
-                      :checked="!!subsidiary.files.find(f => f.type === docType.id)"
-                      class="h-4 w-4 text-blue-500 rounded border-gray-300 mr-3"
-                      disabled
-                    />
-                    <span class="text-sm text-gray-700 mr-3">{{ docType.name }}</span>
-                    <button 
-                      @click="$refs[`subsidiaryFile_${index}_${docType.id}`][0].click()" 
-                      class="text-blue-500 hover:text-blue-600 text-sm ml-auto"
-                    >
-                      Muat Naik
-                    </button>
-                    <input 
-                      type="file" 
-                      @change="(e) => handleSubsidiaryFileUpload(e, index, docType.id)" 
-                      class="hidden" 
-                      :ref="`subsidiaryFile_${index}_${docType.id}`"
-                    />
+                  <div v-for="docType in documentTypes" :key="docType.id" class="mb-4">
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <div class="flex items-center">
+                          <input
+                            type="checkbox"
+                            :checked="subsidiary.files.some(f => f.type === docType.id)"
+                            disabled
+                            class="w-4 h-4 mr-3"
+                          />
+                          <span class="font-medium">{{ docType.name }}</span>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1">{{ docType.description }}</p>
+                      </div>
+                      <div class="flex items-center">
+                        <div v-if="subsidiary.files.find(f => f.type === docType.id)" class="mr-4">
+                          <div class="flex items-center text-sm text-gray-600">
+                            <span>{{ formatFileSize(subsidiary.files.find(f => f.type === docType.id).size) }}</span>
+                            <button 
+                              @click="removeSubsidiaryFile(index, docType.id)"
+                              class="ml-2 text-red-500 hover:text-red-600"
+                            >
+                              <Icon name="delete" class="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <button 
+                          @click="navigateToUpload(docType.id, true, index)"
+                          class="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                        >
+                          <Icon name="upload" class="w-4 h-4 mr-2" />
+                          Muat Naik
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -190,7 +248,9 @@ definePageMeta({
   layout: "admin",
 });
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+
+const router = useRouter()
 
 const parentCompany = ref({
   name: '',
@@ -199,13 +259,123 @@ const parentCompany = ref({
 })
 
 const subsidiaries = ref([])
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+// Map document types to their corresponding section numbers in the upload page
+const documentSectionMap = {
+  'kunci_kira': 1,      // Section index for 'Kunci Kira Kira'
+  'imbangan_duga': 2,   // Section index for 'Imbangan Duga'
+  'ledger': 3,          // Section index for 'Ledger'
+  'bank_reconciliation': 4  // Section index for 'Bank Reconciliation'
+}
 
 const documentTypes = [
-  { id: 'kunci_kira', name: 'Kunci Kira-Kira' },
-  { id: 'imbangan_duga', name: 'Imbangan Duga' },
-  { id: 'ledger', name: 'Ledger' },
-  { id: 'bank_reconciliation', name: 'Bank Reconciliation' }
+  { 
+    id: 'kunci_kira', 
+    name: 'Kunci Kira-Kira', 
+    required: true,
+    description: 'Dokumen kewangan yang menunjukkan kedudukan kewangan koperasi',
+    allowedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  },
+  { 
+    id: 'imbangan_duga', 
+    name: 'Imbangan Duga', 
+    required: true,
+    description: 'Dokumen yang menunjukkan baki akaun',
+    allowedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  },
+  { 
+    id: 'ledger', 
+    name: 'Ledger', 
+    required: true,
+    description: 'Rekod transaksi kewangan',
+    allowedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  },
+  { 
+    id: 'bank_reconciliation', 
+    name: 'Bank Reconciliation', 
+    required: true,
+    description: 'Penyesuaian penyata bank',
+    allowedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  }
 ]
+
+const navigateToUpload = (docType, isSubsidiary, subsidiaryIndex) => {
+  const sectionIndex = documentSectionMap[docType]
+  // Navigate to upload page with the section query parameter
+  router.push({
+    path: '/ahli-kooperasi/upload',
+    query: { section: sectionIndex, isSubsidiary, subsidiaryIndex }
+  })
+}
+
+// Computed properties for progress tracking
+const parentCompanyProgress = computed(() => {
+  const totalRequired = documentTypes.filter(doc => doc.required).length
+  const uploaded = parentCompany.value.files.length
+  return Math.round((uploaded / totalRequired) * 100)
+})
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const validateFile = (file, allowedTypes) => {
+  // Check file type
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error(`Jenis fail tidak disokong. Sila muat naik fail dalam format yang dibenarkan.`)
+  }
+  // Check file size (max 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('Saiz fail terlalu besar. Had maksimum adalah 10MB')
+  }
+  return true
+}
+
+const handleParentFileUpload = async (event, type) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    
+    // Get document type configuration
+    const docType = documentTypes.find(d => d.id === type)
+    validateFile(file, docType.allowedTypes)
+
+    // Remove existing file of the same type if it exists
+    const existingIndex = parentCompany.value.files.findIndex(f => f.type === type)
+    if (existingIndex !== -1) {
+      parentCompany.value.files.splice(existingIndex, 1)
+    }
+
+    // Add new file with additional metadata
+    parentCompany.value.files.push({
+      name: file.name,
+      file: file,
+      type: type,
+      size: formatFileSize(file.size),
+      uploadedAt: new Date().toISOString()
+    })
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const removeParentFile = (type) => {
+  const index = parentCompany.value.files.findIndex(f => f.type === type)
+  if (index !== -1) {
+    parentCompany.value.files.splice(index, 1)
+  }
+}
 
 const addSubsidiary = () => {
   subsidiaries.value.push({
@@ -219,45 +389,37 @@ const removeSubsidiary = (index) => {
   subsidiaries.value.splice(index, 1)
 }
 
-const handleParentFileUpload = (event, type) => {
+const handleSubsidiaryFileUpload = async (event, subsidiaryIndex, type) => {
   const file = event.target.files[0]
-  if (file) {
-    // Remove existing file of the same type if it exists
-    const existingIndex = parentCompany.value.files.findIndex(f => f.type === type)
-    if (existingIndex !== -1) {
-      parentCompany.value.files.splice(existingIndex, 1)
-    }
-    // Add new file with type
-    parentCompany.value.files.push({
-      name: file.name,
-      file: file,
-      type: type
-    })
-  }
-}
+  if (!file) return
 
-const removeParentFile = (type) => {
-  const index = parentCompany.value.files.findIndex(f => f.type === type)
-  if (index !== -1) {
-    parentCompany.value.files.splice(index, 1)
-  }
-}
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    
+    // Get document type configuration
+    const docType = documentTypes.find(d => d.id === type)
+    validateFile(file, docType.allowedTypes)
 
-const handleSubsidiaryFileUpload = (event, subsidiaryIndex, type) => {
-  const file = event.target.files[0]
-  if (file) {
     const subsidiary = subsidiaries.value[subsidiaryIndex]
     // Remove existing file of the same type if it exists
     const existingIndex = subsidiary.files.findIndex(f => f.type === type)
     if (existingIndex !== -1) {
       subsidiary.files.splice(existingIndex, 1)
     }
-    // Add new file with type
+
+    // Add new file with additional metadata
     subsidiary.files.push({
       name: file.name,
       file: file,
-      type: type
+      type: type,
+      size: formatFileSize(file.size),
+      uploadedAt: new Date().toISOString()
     })
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    isLoading.value = false
   }
 }
 
