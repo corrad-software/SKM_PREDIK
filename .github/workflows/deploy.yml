@@ -13,14 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest-10
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '23'
           cache: 'pnpm'
-
-      - name: Setup pnpm
-        run: npm install -g pnpm@latest-10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -43,8 +45,8 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install required software
-            curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            # Install required software - Node.js 23
+            curl -fsSL https://rpm.nodesource.com/setup_23.x | sudo bash -
             sudo yum install -y nodejs
             
             # Install pnpm globally with specific version
@@ -60,7 +62,7 @@ jobs:
             # Initialize git if not already initialized
             if [ ! -d .git ]; then
               sudo git init
-              sudo git remote add origin https://github.com/yourusername/lzs-corradai.git || true
+              sudo git remote add origin https://github.com/corrad-software/SKM_PREDIK.git || true
             fi
             
             # Fix permissions
