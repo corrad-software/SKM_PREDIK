@@ -44,21 +44,21 @@ const documentReview = ref({
   kunciKiraKira: {
     sections: [
       {
-        section: 'Section 1: Document Overview',
+        section: 'Bahagian 1: Gambaran Keseluruhan Dokumen',
         issues: [
           {
-            issueDescription: 'Missing value in row 5',
-            expected: 'Complete financial data in all rows',
-            suggestedCorrection: 'Fill in the missing value in row 5',
-            faultCategory: 'Incomplete Data',
-            impactLevel: 'Minor'
+            issueDescription: 'Nilai hilang di baris 5',
+            expected: 'Data kewangan lengkap di semua baris',
+            suggestedCorrection: 'Isi nilai yang hilang di baris 5',
+            faultCategory: 'Data Tidak Lengkap',
+            impactLevel: 'Kecil'
           },
           {
-            issueDescription: 'Inconsistent data in column B',
-            expected: 'Consistent data format throughout the column',
-            suggestedCorrection: 'Standardize the data format in column B',
-            faultCategory: 'Data Inconsistency',
-            impactLevel: 'Minor'
+            issueDescription: 'Data tidak konsisten di lajur B',
+            expected: 'Format data yang konsisten di seluruh lajur',
+            suggestedCorrection: 'Standardkan format data di lajur B',
+            faultCategory: 'Ketidakkonsistenan Data',
+            impactLevel: 'Kecil'
           }
         ]
       }
@@ -67,7 +67,7 @@ const documentReview = ref({
       totalMajorIssues: 0,
       totalMinorIssues: 2,
       totalRalatDokumen: 0,
-      sectionsRequiringRevisions: ['Document Overview']
+      sectionsRequiringRevisions: ['Gambaran Keseluruhan Dokumen']
     }
   },
   imbanganDuga: { sections: [], summary: { totalMajorIssues: 0, totalMinorIssues: 0, totalRalatDokumen: 0, sectionsRequiringRevisions: [] } },
@@ -260,8 +260,8 @@ const reviewersList = ref([
           <template v-if="isReviewVisible">
             <div class="mt-8 space-y-6">
               <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h3 class="text-xl font-semibold text-slate-800">Document Review Analysis</h3>
-                <p class="text-slate-600 text-sm mt-1">Comprehensive review of uploaded documents and identified issues</p>
+                <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Dokumen</h3>
+                <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
               </div>
 
               <div v-for="(section, sectionIndex) in documentReview.kunciKiraKira.sections" 
@@ -280,7 +280,7 @@ const reviewersList = ref([
                         'bg-red-100 text-red-700': issue.impactLevel === 'Major',
                         'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
                       }" class="px-3 py-1 rounded-full text-sm font-medium">
-                        {{ issue.impactLevel }} Issue
+                        {{ issue.impactLevel }} Isu
                       </div>
                       <div class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
                         {{ issue.faultCategory }}
@@ -290,16 +290,16 @@ const reviewersList = ref([
                     <div class="space-y-2">
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <h5 class="text-sm font-medium text-slate-700">Issue Description</h5>
+                          <h5 class="text-sm font-medium text-slate-700">Penerangan Isu</h5>
                           <p class="text-slate-600">{{ issue.issueDescription }}</p>
                         </div>
                         <div>
-                          <h5 class="text-sm font-medium text-slate-700">Expected Result</h5>
+                          <h5 class="text-sm font-medium text-slate-700">Hasil Yang Dijangka</h5>
                           <p class="text-slate-600">{{ issue.expected }}</p>
                         </div>
                       </div>
                       <div class="pt-2">
-                        <h5 class="text-sm font-medium text-slate-700">Suggested Correction</h5>
+                        <h5 class="text-sm font-medium text-slate-700">Cadangan Pembetulan</h5>
                         <p class="text-slate-600">{{ issue.suggestedCorrection }}</p>
                       </div>
                     </div>
@@ -309,7 +309,7 @@ const reviewersList = ref([
 
               <div class="bg-white rounded-lg shadow-sm border border-slate-200">
                 <div class="p-4 border-b border-slate-200 bg-slate-50">
-                  <h4 class="text-lg font-medium text-slate-800">Review Summary</h4>
+                  <h4 class="text-lg font-medium text-slate-800">Ringkasan Semakan</h4>
                 </div>
                 
                 <div class="p-4">
@@ -318,33 +318,33 @@ const reviewersList = ref([
                       <div class="text-red-800 text-2xl font-bold">
                         {{ documentReview.kunciKiraKira.summary.totalMajorIssues }}
                       </div>
-                      <div class="text-red-600 text-sm">Major Issues</div>
+                      <div class="text-red-600 text-sm">Isu Utama</div>
                     </div>
                     
                     <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
                       <div class="text-yellow-800 text-2xl font-bold">
                         {{ documentReview.kunciKiraKira.summary.totalMinorIssues }}
                       </div>
-                      <div class="text-yellow-600 text-sm">Minor Issues</div>
+                      <div class="text-yellow-600 text-sm">Isu Kecil</div>
                     </div>
                     
                     <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                       <div class="text-blue-800 text-2xl font-bold">
                         {{ documentReview.kunciKiraKira.summary.totalRalatDokumen }}
                       </div>
-                      <div class="text-blue-600 text-sm">Document Corrections</div>
+                      <div class="text-blue-600 text-sm">Pembetulan Dokumen</div>
                     </div>
                     
                     <div class="bg-green-50 p-4 rounded-lg border border-green-100">
                       <div class="text-green-800 text-2xl font-bold">
                         {{ documentReview.kunciKiraKira.summary.sectionsRequiringRevisions.length }}
                       </div>
-                      <div class="text-green-600 text-sm">Sections Needing Review</div>
+                      <div class="text-green-600 text-sm">Bahagian Memerlukan Semakan</div>
                     </div>
                   </div>
 
                   <div class="bg-slate-50 p-4 rounded-lg">
-                    <h5 class="text-sm font-medium text-slate-700 mb-2">Sections Requiring Revisions:</h5>
+                    <h5 class="text-sm font-medium text-slate-700 mb-2">Bahagian Memerlukan Semakan:</h5>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="section in documentReview.kunciKiraKira.summary.sectionsRequiringRevisions"
                             :key="section"
@@ -369,7 +369,7 @@ const reviewersList = ref([
           </Card>
           <Card class="mt-4">
             <CardContent>
-              <h3 class="text-lg font-semibold">Current Document Review</h3>
+              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
               <p v-if="accountingDocuments.imbanganDuga">Imbangan Duga: {{ accountingDocuments.imbanganDuga.name }}</p>
               <p v-if="accountingDocuments.imbanganDugaFailRujukan">Fail Rujukan: {{ accountingDocuments.imbanganDugaFailRujukan.name }}</p>
             </CardContent>
@@ -386,7 +386,7 @@ const reviewersList = ref([
           </Card>
           <Card class="mt-4">
             <CardContent>
-              <h3 class="text-lg font-semibold">Current Document Review</h3>
+              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
               <p v-if="accountingDocuments.ledger">Ledger: {{ accountingDocuments.ledger.name }}</p>
               <p v-if="accountingDocuments.ledgerFailRujukan">Fail Rujukan: {{ accountingDocuments.ledgerFailRujukan.name }}</p>
             </CardContent>
@@ -394,29 +394,29 @@ const reviewersList = ref([
         </div>
 
         <div v-if="currentSection === 4" class="mb-4">
-          <h2 class="text-xl font-semibold my-4">Bank Reconciliation</h2>
+          <h2 class="text-xl font-semibold my-4">Penyelarasan Bank</h2>
           <Card class="mb-4">
             <CardContent>
-              <FormKit type="file" label="Bank Reconciliation" v-model="accountingDocuments.bankReconciliation" class="w-full mb-4" />
+              <FormKit type="file" label="Penyelarasan Bank" v-model="accountingDocuments.bankReconciliation" class="w-full mb-4" />
               <FormKit type="file" label="Fail Rujukan" v-model="accountingDocuments.bankReconciliationFailRujukan" class="w-full mb-4" />
             </CardContent>
           </Card>
           <Card class="mt-4">
             <CardContent>
-              <h3 class="text-lg font-semibold">Current Document Review</h3>
-              <p v-if="accountingDocuments.bankReconciliation">Bank Reconciliation: {{ accountingDocuments.bankReconciliation.name }}</p>
+              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
+              <p v-if="accountingDocuments.bankReconciliation">Penyelarasan Bank: {{ accountingDocuments.bankReconciliation.name }}</p>
               <p v-if="accountingDocuments.bankReconciliationFailRujukan">Fail Rujukan: {{ accountingDocuments.bankReconciliationFailRujukan.name }}</p>
             </CardContent>
           </Card>
         </div>
 
         <div v-if="currentSection === 5" class="mb-4">
-          <h2 class="text-xl font-semibold my-4">Overall Review</h2>
+          <h2 class="text-xl font-semibold my-4">Semakan Keseluruhan</h2>
           
           <!-- Overall Summary Dashboard -->
           <div class="bg-white rounded-lg shadow-sm border border-slate-200 mb-6">
             <div class="p-4 border-b border-slate-200 bg-slate-50">
-              <h3 class="text-lg font-medium text-slate-800">Document Review Summary</h3>
+              <h3 class="text-lg font-medium text-slate-800">Ringkasan Semakan Dokumen</h3>
             </div>
             <div class="p-4">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -424,28 +424,28 @@ const reviewersList = ref([
                   <div class="text-red-800 text-2xl font-bold">
                     {{ Object.values(documentReview).reduce((acc, doc) => acc + doc.summary.totalMajorIssues, 0) }}
                   </div>
-                  <div class="text-red-600 text-sm">Total Major Issues</div>
+                  <div class="text-red-600 text-sm">Jumlah Isu Utama</div>
                 </div>
                 
                 <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
                   <div class="text-yellow-800 text-2xl font-bold">
                     {{ Object.values(documentReview).reduce((acc, doc) => acc + doc.summary.totalMinorIssues, 0) }}
                   </div>
-                  <div class="text-yellow-600 text-sm">Total Minor Issues</div>
+                  <div class="text-yellow-600 text-sm">Jumlah Isu Kecil</div>
                 </div>
                 
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                   <div class="text-blue-800 text-2xl font-bold">
                     {{ Object.values(documentReview).reduce((acc, doc) => acc + doc.summary.totalRalatDokumen, 0) }}
                   </div>
-                  <div class="text-blue-600 text-sm">Total Document Corrections</div>
+                  <div class="text-blue-600 text-sm">Jumlah Pembetulan Dokumen</div>
                 </div>
                 
                 <div class="bg-green-50 p-4 rounded-lg border border-green-100">
                   <div class="text-green-800 text-2xl font-bold">
                     {{ Object.values(documentReview).reduce((acc, doc) => acc + doc.summary.sectionsRequiringRevisions.length, 0) }}
                   </div>
-                  <div class="text-green-600 text-sm">Total Sections Needing Review</div>
+                  <div class="text-green-600 text-sm">Jumlah Bahagian Memerlukan Semakan</div>
                 </div>
               </div>
             </div>
@@ -456,13 +456,13 @@ const reviewersList = ref([
             <!-- Kunci Kira Kira Review -->
             <div class="bg-white rounded-lg shadow-sm border border-slate-200">
               <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                <h3 class="text-lg font-medium text-slate-800">Kunci Kira Kira Review</h3>
+                <h3 class="text-lg font-medium text-slate-800">Semakan Kunci Kira Kira</h3>
                 <div class="flex gap-2">
                   <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-sm">
-                    {{ documentReview.kunciKiraKira.summary.totalMajorIssues }} Major
+                    {{ documentReview.kunciKiraKira.summary.totalMajorIssues }} Utama
                   </span>
                   <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">
-                    {{ documentReview.kunciKiraKira.summary.totalMinorIssues }} Minor
+                    {{ documentReview.kunciKiraKira.summary.totalMinorIssues }} Kecil
                   </span>
                 </div>
               </div>
@@ -515,30 +515,30 @@ const reviewersList = ref([
           <div class="mt-6 flex justify-end space-x-4">
             <Button variant="outline" class="btn">
               <Icon name="material-symbols:download" class="mr-2" />
-              Download Report
+              Muat Turun Laporan
             </Button>
           </div>
         </div>
 
         <div class="flex justify-between mt-4">
-          <Button @click="prevSection" :disabled="currentSection === 0" class="btn"><Icon name="material-symbols:chevron-left" class="mr-2"></Icon>Previous</Button>
-          <Button v-if="currentSection === sections.length - 1" @click="submitForm" class="btn"><Icon name="lsicon:submit-filled" class="mr-2"></Icon>Submit</Button>
-          <Button v-else @click="nextSection" class="btn"><Icon name="material-symbols:chevron-right" class="mr-2"></Icon>Next</Button>
+          <Button @click="prevSection" :disabled="currentSection === 0" class="btn"><Icon name="material-symbols:chevron-left" class="mr-2"></Icon>Sebelumnya</Button>
+          <Button v-if="currentSection === sections.length - 1" @click="submitForm" class="btn"><Icon name="lsicon:submit-filled" class="mr-2"></Icon>Hantar</Button>
+          <Button v-else @click="nextSection" class="btn"><Icon name="material-symbols:chevron-right" class="mr-2"></Icon>Seterusnya</Button>
         </div>
       </CardContent>
     </Card>
 
     <Modal v-model:open="isOpen">
       <ModalHeader>
-        <ModalTitle>Form Submission</ModalTitle>
-        <ModalDescription>Your form has been submitted successfully.</ModalDescription>
+        <ModalTitle>Penghantaran Borang</ModalTitle>
+        <ModalDescription>Borang anda telah dihantar dengan jayanya.</ModalDescription>
       </ModalHeader>
       <ModalBody>
-        <p>Thank you for your submission. We will review your application and get back to you shortly.</p>
+        <p>Terima kasih atas penghantaran anda. Kami akan menyemak permohonan anda dan menghubungi anda tidak lama lagi.</p>
       </ModalBody>
       <ModalFooter>
-        <Button variant="outline" @click="isOpen = false">Close</Button>
-        <Button @click="refreshPage">Affirmative</Button>
+        <Button variant="outline" @click="isOpen = false">Tutup</Button>
+        <Button @click="refreshPage">Sahkan</Button>
       </ModalFooter>
     </Modal>
 
