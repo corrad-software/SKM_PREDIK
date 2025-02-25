@@ -45,11 +45,17 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install required software
-            curl -sL https://rpm.nodesource.com/setup_22.x | sudo bash -
+            # Update system packages
+            sudo yum update -y
+            
+            # Install Node.js
+            curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
             sudo yum install -y nodejs
             
-            # Install pnpm and PM2
+            # Install development tools (needed for some npm packages)
+            sudo yum group install -y "Development Tools"
+            
+            # Install pnpm using npm
             sudo npm install -g pnpm@8 pm2
             
             # Create and setup project directory
