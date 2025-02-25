@@ -25,7 +25,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build application
         run: pnpm build
@@ -95,7 +95,7 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
             # Install dependencies
-            pnpm install --frozen-lockfile --prod
+            pnpm install
             
             # Stop any existing PM2 processes
             pm2 stop app || true
