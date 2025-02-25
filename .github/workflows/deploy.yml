@@ -17,13 +17,18 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'yarn'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build application
-        run: yarn build
+        run: pnpm build
         env:
           PORT: 3000
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -43,7 +48,13 @@ jobs:
             # Install required software
             curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -
             sudo yum install -y nodejs
-            sudo npm install -g yarn pm2
+            
+            # Install pnpm
+            curl -fsSL https://get.pnpm.io/install.sh | sudo sh -
+            source /etc/profile
+            
+            # Install PM2 globally
+            sudo npm install -g pm2
             
             # Create and setup project directory
             sudo mkdir -p /home/skm
@@ -69,7 +80,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: ".output/,package.json,yarn.lock,prisma/"
+          source: ".output/,package.json,pnpm-lock.yaml"
           target: "/home/skm"
           strip_components: 0
 
@@ -101,7 +112,7 @@ jobs:
             sudo chmod 644 .env
             
             # Install dependencies and start the application
-            yarn install --frozen-lockfile --production
+            pnpm install --frozen-lockfile --prod
             
-            pm2 start "yarn preview" --name app
+            pm2 start "pnpm preview" --name app
             pm2 save 
