@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - production
+      - production2
 
 jobs:
   deploy:
@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '22.14.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -55,13 +55,6 @@ jobs:
         run: |
           # First, ensure the remote directory exists and set it up
           ssh $USERNAME@$HOST '
-            # Install Node.js LTS
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm install --lts
-            nvm use --lts
-            
             # Install pnpm
             npm install -g pnpm@8
             
@@ -90,10 +83,6 @@ jobs:
             OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
             EOL
             
-            # Load NVM
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            
             # Install dependencies
             pnpm install
             
@@ -103,4 +92,4 @@ jobs:
             
             # Start the application
             pm2 start "pnpm preview" --name app
-            pm2 save 
+            pm2 save'
