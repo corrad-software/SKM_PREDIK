@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { streamText } from "ai";
+import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { z } from "zod";
 
 export default defineLazyEventHandler(async () => {
   const config = useRuntimeConfig();
@@ -8,6 +9,20 @@ export default defineLazyEventHandler(async () => {
 
   const openai = createOpenAI({
     apiKey: config.openaiApiKey,
+  });
+
+  // Define the analysis schema
+  const analysisSchema = z.object({
+    total_major_issues: z.number(),
+    total_minor_issues: z.number(),
+    total_ralat_dokumen: z.number(),
+    sections_requiring_revisions: z.string(),
+    detailed_analysis: z.object({
+      major_issues: z.array(z.string()),
+      minor_issues: z.array(z.string()),
+      document_errors: z.array(z.string()),
+      section_revisions: z.record(z.string()),
+    }),
   });
 
   return defineEventHandler(async (event) => {
@@ -29,10 +44,12 @@ export default defineLazyEventHandler(async () => {
       // First fetch the financial statement and its entries
       const { data: statement, error: statementError } = await supabase
         .from("financial_statements")
-        .select(`
+        .select(
+          `
           *,
           financial_entries (*)
-        `)
+        `
+        )
         .eq("id", statement_id)
         .single();
 
@@ -102,87 +119,62 @@ Fokus pada:
 - Pengkategorian yang betul
 - Kelengkapan bahagian
 - Baki dan penyesuaian
-- Format dan persembahan yang betul`;
+- Format dan persembahan yang betul
+
+PENTING: Anda mesti memberikan respons dalam format yang tepat seperti berikut:
+{
+  "total_major_issues": <nombor isu major>,
+  "total_minor_issues": <nombor isu minor>,
+  "total_ralat_dokumen": <nombor ralat dokumen>,
+  "sections_requiring_revisions": "<senarai nama bahagian yang dipisahkan dengan koma>",
+  "detailed_analysis": {
+    "major_issues": ["<isu major 1>", "<isu major 2>", ...],
+    "minor_issues": ["<isu minor 1>", "<isu minor 2>", ...],
+    "document_errors": ["<ralat 1>", "<ralat 2>", ...],
+    "section_revisions": {
+      "<nama_bahagian>": "<penerangan keperluan semakan>"
+    }
+  }
+}
+
+Pastikan:
+1. Semua nombor adalah dalam format angka (bukan string)
+2. sections_requiring_revisions adalah string dengan nama bahagian dipisahkan koma
+3. Semua array mengandungi string
+4. section_revisions adalah objek dengan kunci nama bahagian dan nilai penerangan
+5. Semua teks dalam Bahasa Melayu yang formal dan profesional`;
 
       // Combine with reference content if exists
       const systemPrompt = referenceContent
         ? `${basePrompt}\n\nPanduan tambahan dari pengguna:\n${referenceContent}\n\n`
         : basePrompt;
 
-      // Add response format instructions
-      const fullPrompt = `${systemPrompt}\n\nBerikan respons dalam format JSON dengan struktur berikut:
-{
-  "total_major_issues": number,
-  "total_minor_issues": number,
-  "total_ralat_dokumen": number,
-  "sections_requiring_revisions": "senarai nama bahagian yang dipisahkan dengan koma",
-  "detailed_analysis": {
-    "major_issues": ["senarai isu-isu major dalam Bahasa Melayu"],
-    "minor_issues": ["senarai isu-isu minor dalam Bahasa Melayu"],
-    "document_errors": ["senarai ralat dokumen dalam Bahasa Melayu"],
-    "section_revisions": {
-      "nama_bahagian": "penerangan keperluan semakan dalam Bahasa Melayu"
-    }
-  }
-}
-
-Pastikan semua teks dan penerangan diberikan dalam Bahasa Melayu yang formal dan profesional.`;
-
-      console.log(fullPrompt);
-
-      const result = streamText({
-        model: openai("gpt-4"),
-        messages: [
-          {
-            role: "system",
-            content: fullPrompt,
-          },
-          {
-            role: "user",
-            content: `Please analyze this financial statement: ${JSON.stringify(
-              structuredData,
-              null,
-              2
-            )}`,
-          },
-        ],
-        temperature: 0.2,
-        maxTokens: 2000,
-        presencePenalty: 0,
-        frequencyPenalty: 0,
-        topP: 0.1,
-        stopSequences: ["```"],
-        response_format: { type: "json_object" },
-      });
-
-      // Use the proper stream handling from the SDK
-      const { textStream } = result;
-      let fullResponse = "";
-
-      for await (const chunk of textStream) {
-        if (typeof chunk === "string") {
-          fullResponse += chunk;
-        }
-      }
-
       try {
-        // Parse and validate the response
-        const analysis = JSON.parse(fullResponse);
-
-        // Validate the required fields
-        const requiredFields = [
-          "total_major_issues",
-          "total_minor_issues",
-          "total_ralat_dokumen",
-          "sections_requiring_revisions",
-          "detailed_analysis",
-        ];
-
-        for (const field of requiredFields) {
-          if (!(field in analysis)) {
-            throw new Error(`Missing required field: ${field}`);
-          }
-        }
+        const { object: analysis } = await generateObject({
+          model: openai("gpt-4"),
+          schema: analysisSchema,
+          schemaDescription:
+            "Analisis penyata kewangan yang mengandungi jumlah isu, senarai isu terperinci, dan keperluan semakan",
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
+            {
+              role: "user",
+              content: `Sila analisis penyata kewangan ini: ${JSON.stringify(
+                structuredData,
+                null,
+                2
+              )}`,
+            },
+          ],
+          temperature: 0.2,
+          maxTokens: 2000,
+          presencePenalty: 0,
+          frequencyPenalty: 0,
+          topP: 0.1,
+        });
 
         // Store the analysis result in Supabase
         const { error: updateError } = await supabase
@@ -201,16 +193,11 @@ Pastikan semua teks dan penerangan diberikan dalam Bahasa Melayu yang formal dan
           status: "success",
           data: analysis,
         };
-      } catch (parseError) {
-        console.error(
-          "Parse Error:",
-          parseError,
-          "Raw Response:",
-          fullResponse
-        );
+      } catch (error) {
+        console.error("Analysis Error:", error);
         throw createError({
           statusCode: 500,
-          message: "Failed to parse AI response",
+          message: error.message || "Failed to analyze financial statement",
         });
       }
     } catch (error) {

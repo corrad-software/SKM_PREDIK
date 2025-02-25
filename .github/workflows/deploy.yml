@@ -1,0 +1,107 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build application
+        run: yarn build
+        env:
+          PORT: 3000
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          SUPABASE_DATABASE_PASSWORD: ${{ secrets.SUPABASE_DATABASE_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Initial EC2 Setup
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Install required software
+            curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            sudo yum install -y nodejs
+            sudo npm install -g yarn pm2
+            
+            # Create and setup project directory
+            sudo mkdir -p /home/skm
+            cd /home/skm
+            
+            # Initialize git if not already initialized
+            if [ ! -d .git ]; then
+              sudo git init
+              sudo git remote add origin https://github.com/yourusername/lzs-corradai.git || true
+            fi
+            
+            # Fix permissions
+            sudo chown -R ubuntu:ubuntu /home/skm
+            sudo chmod -R 755 /home/skm
+            
+            # Stop existing PM2 processes if any
+            pm2 stop app || true
+            pm2 delete app || true
+
+      - name: Copy built files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: ".output/,package.json,yarn.lock,prisma/"
+          target: "/home/skm"
+          strip_components: 0
+
+      - name: Final EC2 Setup and Start
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/skm
+            
+            # Fix permissions again after file copy
+            sudo chown -R ubuntu:ubuntu /home/skm
+            sudo chmod -R 755 /home/skm
+            
+            # Create .env file
+            sudo tee .env > /dev/null << EOL
+            PORT=3000
+            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_KEY }}"
+            SUPABASE_JWT_SECRET="${{ secrets.SUPABASE_JWT_SECRET }}"
+            SUPABASE_DATABASE_PASSWORD="${{ secrets.SUPABASE_DATABASE_PASSWORD }}"
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+            EOL
+            
+            sudo chown ubuntu:ubuntu .env
+            sudo chmod 644 .env
+            
+            # Install dependencies and start the application
+            yarn install --frozen-lockfile --production
+            
+            pm2 start "yarn preview" --name app
+            pm2 save 

@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { getRequestHeaders, createError } from "h3";
 import { createClient } from "@supabase/supabase-js";
+import { CONSTANTS } from "~/server/utils/constants";
 
 const ENV = useRuntimeConfig();
 
@@ -42,10 +43,16 @@ export default defineEventHandler(async (event) => {
       });
     }    
 
-    // Find file and type from form data
+    // Find file, type and organization_id from form data
     let statementFile = null;
     let referenceFile = null;
     let statementType = "kunci_kira_kira"; // default value
+    let organizationId = null;
+    let yearCurrent = null;
+    let yearPrevious = null;
+    let state = null;
+    let auditedBy = null;
+    let reviewedBy = null;
 
     for (const part of formData) {
       if (part.name === "statement_file" && part.filename) {
@@ -54,7 +61,57 @@ export default defineEventHandler(async (event) => {
         referenceFile = part;
       } else if (part.name === "type") {
         statementType = part.data.toString().trim();
+      } else if (part.name === "organization_id") {
+        organizationId = part.data.toString().trim();
+      } else if (part.name === "year_current") {
+        yearCurrent = parseInt(part.data.toString().trim());
+      } else if (part.name === "year_previous") {
+        yearPrevious = parseInt(part.data.toString().trim());
+      } else if (part.name === "state") {
+        state = part.data.toString().trim();
+      } else if (part.name === "audited_by") {
+        auditedBy = part.data.toString().trim();
+      } else if (part.name === "reviewed_by") {
+        reviewedBy = part.data.toString().trim();
       }
+    }
+
+    // Validate required fields
+    if (!organizationId) {
+      throw createError({
+        statusCode: 400,
+        message: "Organization ID is required",
+      });
+    }
+
+    if (!yearCurrent || !yearPrevious) {
+      throw createError({
+        statusCode: 400,
+        message: "Both current year and previous year are required",
+      });
+    }
+
+    // Verify organization exists and user has access
+    const { data: organization, error: orgError } = await supabase
+      .from('organizations')
+      .select('id, organization_type')
+      .eq('id', organizationId)
+      .eq('created_by', CONSTANTS.DEFAULT_USER_ID)
+      .single();
+
+    if (orgError || !organization) {
+      throw createError({
+        statusCode: 404,
+        message: "Organization not found or access denied",
+      });
+    }
+
+    // Verify organization is of type 'child'
+    if (organization.organization_type !== CONSTANTS.ORGANIZATION_TYPE.CHILD) {
+      throw createError({
+        statusCode: 400,
+        message: "Financial statements can only be uploaded for child organizations",
+      });
     }
 
     // Validate statement file
@@ -169,7 +226,14 @@ export default defineEventHandler(async (event) => {
         file_path: statementFilePath,
         statement_type: statementType,
         status: 'draft',
-        reference_file_id: referenceData?.id || null
+        organization_id: organizationId,
+        created_by: CONSTANTS.DEFAULT_USER_ID,
+        reference_file_id: referenceData?.id || null,
+        state: state,
+        year_current: yearCurrent,
+        year_previous: yearPrevious,
+        audited_by: auditedBy,
+        reviewed_by: reviewedBy
       })
       .select()
       .single();
@@ -180,19 +244,6 @@ export default defineEventHandler(async (event) => {
         statusCode: 500,
         message: `Failed to create financial statement record: ${statementError.message}`,
       });
-    }
-
-    // Update reference file with statement_id
-    if (referenceData) {
-      const { error: updateRefError } = await supabase
-        .from('reference_files')
-        .update({ statement_id: statementData.id })
-        .eq('id', referenceData.id);
-
-      if (updateRefError) {
-        console.error('Reference Update Error:', updateRefError);
-        // Non-blocking error, continue with the process
-      }
     }
 
     // Read the Excel file using exceljs
@@ -211,7 +262,13 @@ export default defineEventHandler(async (event) => {
     // Convert to array of rows
     const rawData = [];
     worksheet.eachRow((row, rowNumber) => {
-      rawData.push(row.values.slice(1));
+      // Get values from columns A, B, and C
+      const values = [
+        row.getCell(1).value, // Column A - Label
+        row.getCell(2).value, // Column B - Previous year amount
+        row.getCell(3).value  // Column C - Current year amount
+      ];
+      rawData.push(values);
     });
 
     // Skip the first row (headers) and process the data
@@ -225,17 +282,21 @@ export default defineEventHandler(async (event) => {
       if (!row[0] || String(row[0]).trim() === "") continue;
 
       const label = String(row[0]).trim();
-      const rawValue = row[1] !== null ? String(row[1]).trim() : "";
+      const previousYearValue = row[1] !== null ? String(row[1]).trim() : "";
+      const currentYearValue = row[2] !== null ? String(row[2]).trim() : "";
       sortOrder++;
 
       // Check if this is a main section (when value is '#')
-      if (rawValue === "#") {
+      if (previousYearValue === "#" || currentYearValue === "#") {
         currentSection = label;
         entries.push({
           statement_id: statementData.id,
           section: label,
           label: label,
-          amount: null,
+          amount_current: null,
+          amount_previous: null,
+          year_current: yearCurrent,
+          year_previous: yearPrevious,
           is_total: false,
           parent_section: null,
           sort_order: sortOrder,
@@ -243,7 +304,8 @@ export default defineEventHandler(async (event) => {
         continue;
       }
 
-      const value = parseNumericValue(rawValue);
+      const previousValue = parseNumericValue(previousYearValue);
+      const currentValue = parseNumericValue(currentYearValue);
       const isTotal = label.toLowerCase().startsWith("jumlah");
 
       // Add entry
@@ -251,7 +313,10 @@ export default defineEventHandler(async (event) => {
         statement_id: statementData.id,
         section: currentSection || "uncategorized",
         label: label,
-        amount: value,
+        amount_current: currentValue,
+        amount_previous: previousValue,
+        year_current: yearCurrent,
+        year_previous: yearPrevious,
         is_total: isTotal,
         parent_section: currentSection,
         sort_order: sortOrder,
@@ -274,6 +339,9 @@ export default defineEventHandler(async (event) => {
       status: "success",
       data: {
         statement_id: statementData.id,
+        organization_id: organizationId,
+        year_current: yearCurrent,
+        year_previous: yearPrevious,
         statement_file: {
           name: statementFileName,
           path: statementFilePath,

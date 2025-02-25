@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { createError } from "h3";
+import { CONSTANTS } from "~/server/utils/constants";
 
 const ENV = useRuntimeConfig();
 
-// Initialize Supabase client with service role key for server-side operations
+// Initialize Supabase client
 const supabase = createClient(
   ENV.public.supabaseUrl,
   ENV.supabaseServiceKey,
@@ -17,13 +18,40 @@ const supabase = createClient(
 
 export default defineEventHandler(async (event) => {
   try {
-    // Get all groups with their statement items
+    // Get organization_id from query params
+    const query = getQuery(event);
+    const { organization_id } = query;
+
+    if (!organization_id) {
+      throw createError({
+        statusCode: 400,
+        message: "Organization ID is required"
+      });
+    }
+
+    // Verify organization exists and user has access
+    const { data: organization, error: orgError } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('id', organization_id)
+      .eq('created_by', CONSTANTS.DEFAULT_USER_ID)
+      .single();
+
+    if (orgError || !organization) {
+      throw createError({
+        statusCode: 404,
+        message: "Organization not found or access denied"
+      });
+    }
+
+    // Get all groups with their statement items for the organization
     const { data: groups, error: groupsError } = await supabase
       .from('statement_groups')
       .select(`
         id,
         name,
         description,
+        organization_id,
         created_at,
         updated_at,
         statement_group_items (
@@ -40,6 +68,7 @@ export default defineEventHandler(async (event) => {
           )
         )
       `)
+      .eq('organization_id', organization_id)
       .order('created_at', { ascending: false });
 
     if (groupsError) {
@@ -101,6 +130,7 @@ export default defineEventHandler(async (event) => {
         id: group.id,
         name: group.name,
         description: group.description,
+        organization_id: group.organization_id,
         created_at: group.created_at,
         updated_at: group.updated_at,
         statements: statementStats
