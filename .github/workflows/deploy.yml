@@ -20,9 +20,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
+        run: npm install -g pnpm@latest-10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -49,9 +47,8 @@ jobs:
             curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -
             sudo yum install -y nodejs
             
-            # Install pnpm
-            curl -fsSL https://get.pnpm.io/install.sh | sudo sh -
-            source /etc/profile
+            # Install pnpm globally with specific version
+            sudo npm install -g pnpm@latest-10
             
             # Install PM2 globally
             sudo npm install -g pm2
