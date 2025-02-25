@@ -31,6 +31,11 @@
       "title": "Auditor SKM",
       "items": [
         {
+          "name": "Senarai Koperasi",
+          "icon": "material-symbols:list-rounded",
+          "path": "/auditor-skm/entity-management"
+        },
+        {
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
           "path": "/ahli-kooperasi/index-review"
@@ -38,7 +43,7 @@
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
-          "path": "/ahli-kooperasi/ledger-review"
+          "path": "/auditor-skm/ledger-review"
         }
       ]
     }
