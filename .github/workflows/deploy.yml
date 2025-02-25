@@ -45,18 +45,24 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Update system packages
-            sudo yum update -y
+            # Install NVM
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+            
+            # Load NVM
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
             # Install Node.js
-            curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
-            sudo yum install -y nodejs
+            nvm install 22
+            nvm use 22
             
-            # Install development tools (needed for some npm packages)
-            sudo yum group install -y "Development Tools"
+            # Verify installations
+            node --version
+            npm --version
             
-            # Install pnpm using npm
-            sudo npm install -g pnpm@8 pm2
+            # Install pnpm and PM2 globally
+            npm install -g pnpm@8
+            npm install -g pm2
             
             # Create and setup project directory
             sudo mkdir -p /home/skm
