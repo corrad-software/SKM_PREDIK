@@ -93,6 +93,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Load NVM and Node.js environment
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 22
+            
             cd /home/skm
             
             # Fix permissions again after file copy
@@ -113,8 +118,13 @@ jobs:
             sudo chown ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} .env
             sudo chmod 644 .env
             
+            # Reinstall global packages to ensure they're available
+            npm install -g pnpm@8
+            npm install -g pm2
+            
             # Install dependencies and start the application
             pnpm install
             
+            # Start the application with full path to pnpm
             pm2 start "pnpm preview" --name app
             pm2 save
