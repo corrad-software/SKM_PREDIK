@@ -10,18 +10,25 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.1.13",
+    "@ai-sdk/vue": "^1.1.18",
     "@floating-ui/vue": "^1.1.5",
     "@formkit/nuxt": "^1.6.7",
     "@nuxt/fonts": "^0.10.2",
     "@nuxt/icon": "^1.7.2",
     "@splidejs/vue-splide": "^0.6.12",
+    "@supabase/supabase-js": "^2.48.1",
     "@tailwindcss/forms": "^0.5.9",
     "@vueuse/core": "^11.3.0",
+    "ai": "^4.1.45",
+    "exceljs": "^4.4.0",
     "meilisearch": "^0.48.2",
     "nuxt": "^3.15.4",
+    "nuxt-openapi-docs-module": "^5.3.1",
     "prismjs": "^1.29.0",
     "vue": "latest",
-    "vue-router": "latest"
+    "vue-router": "latest",
+    "zod": "^3.24.2"
   },
   "packageManager": "pnpm@9.9.0+sha512.60c18acd138bff695d339be6ad13f7e936eea6745660d4cc4a776d5247c540d0edee1a563695c183a66eb917ef88f2b4feb1fc25f32a7adcadc7aaf3438e99c1",
   "devDependencies": {
