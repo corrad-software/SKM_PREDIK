@@ -16,6 +16,14 @@ const supabase = createClient(
   }
 );
 
+// Define document types to check
+const DOCUMENT_TYPES = {
+  KUNCI_KIRA: 'kunci_kira_kira',
+  IMBANGAN_DUGA: 'imbangan_duga',
+  LEDGER: 'ledger',
+  BANK_RECON: 'bank_recon'
+};
+
 export default defineEventHandler(async (event) => {
   try {
     const id = event.context.params.id;
@@ -28,6 +36,7 @@ export default defineEventHandler(async (event) => {
         name,
         description,
         bank_account,
+        organization_type,
         status,
         created_at,
         updated_at,
@@ -37,6 +46,7 @@ export default defineEventHandler(async (event) => {
             name,
             description,
             bank_account,
+            organization_type,
             status,
             created_at,
             updated_at
@@ -47,6 +57,8 @@ export default defineEventHandler(async (event) => {
             id,
             name,
             description,
+            bank_account,
+            organization_type,
             status
           )
         ),
@@ -85,6 +97,7 @@ export default defineEventHandler(async (event) => {
       name: child.child.name,
       description: child.child.description,
       bank_account: child.child.bank_account,
+      organization_type: child.child.organization_type,
       status: child.child.status,
       created_at: child.child.created_at,
       updated_at: child.child.updated_at
@@ -118,6 +131,14 @@ export default defineEventHandler(async (event) => {
       };
     });
 
+    // Check document upload status
+    const uploadedDocuments = {
+      [DOCUMENT_TYPES.KUNCI_KIRA]: statements.some(s => s.statement_type === DOCUMENT_TYPES.KUNCI_KIRA),
+      [DOCUMENT_TYPES.IMBANGAN_DUGA]: statements.some(s => s.statement_type === DOCUMENT_TYPES.IMBANGAN_DUGA),
+      [DOCUMENT_TYPES.LEDGER]: statements.some(s => s.statement_type === DOCUMENT_TYPES.LEDGER),
+      [DOCUMENT_TYPES.BANK_RECON]: statements.some(s => s.statement_type === DOCUMENT_TYPES.BANK_RECON)
+    };
+
     return {
       status: "success",
       data: {
@@ -125,6 +146,7 @@ export default defineEventHandler(async (event) => {
         name: organization.name,
         description: organization.description,
         bank_account: organization.bank_account,
+        organization_type: organization.organization_type,
         status: organization.status,
         created_at: organization.created_at,
         updated_at: organization.updated_at,
@@ -136,7 +158,8 @@ export default defineEventHandler(async (event) => {
           by_type: statements.reduce((acc, stmt) => {
             acc[stmt.statement_type] = (acc[stmt.statement_type] || 0) + 1;
             return acc;
-          }, {})
+          }, {}),
+          uploaded_documents: uploadedDocuments
         }
       }
     };

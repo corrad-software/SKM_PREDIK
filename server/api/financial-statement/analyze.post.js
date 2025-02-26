@@ -13,16 +13,20 @@ export default defineLazyEventHandler(async () => {
 
   // Define the analysis schema
   const analysisSchema = z.object({
-    total_major_issues: z.number(),
-    total_minor_issues: z.number(),
-    total_ralat_dokumen: z.number(),
-    sections_requiring_revisions: z.string(),
-    detailed_analysis: z.object({
-      major_issues: z.array(z.string()),
-      minor_issues: z.array(z.string()),
-      document_errors: z.array(z.string()),
-      section_revisions: z.record(z.string()),
-    }),
+    document_overview: z.array(z.object({
+      issue_type: z.string(),
+      issue_category: z.string(),
+      issue_description: z.string(),
+      expected_result: z.string(),
+      correction_suggestion: z.string()
+    })),
+    summary: z.object({
+      major_issues: z.number(),
+      minor_issues: z.number(),
+      document_revisions: z.number(),
+      sections_needing_review: z.number(),
+      sections_to_review: z.array(z.string())
+    })
   });
 
   return defineEventHandler(async (event) => {
@@ -108,41 +112,35 @@ export default defineLazyEventHandler(async () => {
       }
 
       // Create the base prompt
-      const basePrompt = `Anda adalah pakar audit kewangan. Sila analisis penyata kewangan ini dan berikan:
-1. Isu-isu major (masalah kritikal yang memerlukan perhatian segera)
-2. Isu-isu minor (masalah kurang kritikal yang perlu ditangani)
-3. Ralat dokumen (isu-isu format atau persembahan)
-4. Bahagian yang memerlukan semakan
+      const basePrompt = `Anda adalah pakar audit kewangan. Sila analisis penyata kewangan ini dalam dua bahagian:
 
-Fokus pada:
-- Ketepatan matematik
-- Pengkategorian yang betul
-- Kelengkapan bahagian
-- Baki dan penyesuaian
-- Format dan persembahan yang betul
-
-PENTING: Anda mesti memberikan respons dalam format yang tepat seperti berikut:
+BAHAGIAN 1: GAMBARAN KESELURUHAN DOKUMEN
+Senaraikan setiap isu yang ditemui dalam format berikut:
 {
-  "total_major_issues": <nombor isu major>,
-  "total_minor_issues": <nombor isu minor>,
-  "total_ralat_dokumen": <nombor ralat dokumen>,
-  "sections_requiring_revisions": "<senarai nama bahagian yang dipisahkan dengan koma>",
-  "detailed_analysis": {
-    "major_issues": ["<isu major 1>", "<isu major 2>", ...],
-    "minor_issues": ["<isu minor 1>", "<isu minor 2>", ...],
-    "document_errors": ["<ralat 1>", "<ralat 2>", ...],
-    "section_revisions": {
-      "<nama_bahagian>": "<penerangan keperluan semakan>"
+  "document_overview": [
+    {
+      "issue_type": "<Kecil Isu>",
+      "issue_category": "<contoh: Data Tidak Lengkap, Ketidakkonsistenan Data>",
+      "issue_description": "<Penerangan Isu - contoh: Nilai hilang di baris 5>",
+      "expected_result": "<Hasil Yang Dijangka - contoh: Data kewangan lengkap di semua baris>",
+      "correction_suggestion": "<Cadangan Pembetulan - contoh: Isi nilai yang hilang di baris 5>"
     }
+  ],
+  "summary": {
+    "major_issues": <nombor isu utama>,
+    "minor_issues": <nombor isu kecil>,
+    "document_revisions": <nombor pembetulan dokumen>,
+    "sections_needing_review": <nombor bahagian yang memerlukan semakan>,
+    "sections_to_review": ["<nama bahagian 1>", "<nama bahagian 2>", ...]
   }
 }
 
 Pastikan:
 1. Semua nombor adalah dalam format angka (bukan string)
-2. sections_requiring_revisions adalah string dengan nama bahagian dipisahkan koma
-3. Semua array mengandungi string
-4. section_revisions adalah objek dengan kunci nama bahagian dan nilai penerangan
-5. Semua teks dalam Bahasa Melayu yang formal dan profesional`;
+2. Semua teks dalam Bahasa Melayu yang formal dan profesional
+3. issue_type mesti salah satu dari: "Kecil Isu" atau "Isu Utama"
+4. issue_category mesti deskriptif dan spesifik
+5. Setiap isu mesti mempunyai penerangan yang jelas dan cadangan pembetulan yang praktikal`;
 
       // Combine with reference content if exists
       const systemPrompt = referenceContent

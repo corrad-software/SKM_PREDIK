@@ -3,11 +3,20 @@ definePageMeta({
   layout: "admin",
 });
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 
 const route = useRoute()
 const sections = ref(['Butiran Koperasi', 'Kunci Kira Kira', 'Imbangan Duga', 'Ledger', 'Bank Reconciliation', 'Overall Review']);
 const currentSection = ref(0);
+
+// Add cookie storage for form data
+const formDataCookie = useCookie('upload-form-data', {
+  maxAge: 3600, // Cookie expires in 1 hour
+  watch: true // Watch for changes in the cookie value
+})
+
+// Add new ref for organization type selection with cookie storage
+const isParentOrganization = ref(formDataCookie.value?.isParentOrganization ?? true)
 
 // Get subsidiary parameters from route
 const isSubsidiary = computed(() => route.query.isSubsidiary === '1')
@@ -16,19 +25,62 @@ const subsidiaryIndex = computed(() => {
   return !isNaN(index) ? index : null
 })
 
+// Add organization type options
+const organizationTypeOptions = [
+  { label: 'Koperasi Induk', value: true },
+  { label: 'Anak Syarikat', value: false }
+]
+
+// Initialize kooperasiDetails with cookie data
+const kooperasiDetails = ref({
+  subsidiariKoperasi: formDataCookie.value?.subsidiariKoperasi || '',
+  negeri: formDataCookie.value?.negeri || '',
+  tahunKewanganSemasa: formDataCookie.value?.tahunKewanganSemasa || '',
+  tahunKewanganSebelum: formDataCookie.value?.tahunKewanganSebelum || '',
+  diauditOleh: formDataCookie.value?.diauditOleh || '',
+  disemakOleh: formDataCookie.value?.disemakOleh || ''
+})
+
+// Watch for changes in form data and update cookie
+watch([kooperasiDetails, isParentOrganization], ([newDetails, newIsParent]) => {
+  formDataCookie.value = {
+    ...newDetails,
+    isParentOrganization: newIsParent
+  }
+}, { deep: true })
+
 // Function to set initial section based on URL parameter
 const initializeSection = () => {
   const sectionParam = parseInt(route.query.section)
   if (!isNaN(sectionParam) && sectionParam >= 0 && sectionParam < sections.value.length) {
     currentSection.value = sectionParam
   }
+  
+  // Set organization type based on route query
+  if (isSubsidiary.value) {
+    isParentOrganization.value = false
+  }
+}
+
+// Function to clear form data and cookies
+const clearFormData = () => {
+  kooperasiDetails.value = {
+    subsidiariKoperasi: '',
+    negeri: '',
+    tahunKewanganSemasa: '',
+    tahunKewanganSebelum: '',
+    diauditOleh: '',
+    disemakOleh: ''
+  }
+  isParentOrganization.value = true
+  formDataCookie.value = null
 }
 
 // Update page title based on whether we're uploading for subsidiary
 const pageTitle = computed(() => {
-  return isSubsidiary.value 
-    ? `Muat Naik Dokumen Audit - Anak Syarikat ${subsidiaryIndex.value + 1}`
-    : 'Muat Naik Dokumen Audit'
+  return !isParentOrganization.value 
+    ? `Muat Naik Dokumen Audit - Anak Syarikat`
+    : 'Muat Naik Dokumen Audit - Koperasi Induk'
 })
 
 // Initialize section on component mount
@@ -52,6 +104,7 @@ const isOpen = ref(false);
 
 const submitForm = () => {
   isOpen.value = true;
+  clearFormData(); // Clear form data after successful submission
 };
 
 const accountingDocuments = ref({
@@ -64,6 +117,94 @@ const accountingDocuments = ref({
   bankReconciliation: null,
   bankReconciliationFailRujukan: null
 });
+
+// Add upload status tracking
+const uploadStatus = ref({
+  kunciKiraKira: { loading: false, error: null },
+  imbanganDuga: { loading: false, error: null },
+  ledger: { loading: false, error: null },
+  bankReconciliation: { loading: false, error: null }
+});
+
+// Remove the simple fileAttachments ref and replace with more specific structure
+const fileAttachments = ref({
+  kunciKiraKira: { statement: null, reference: null },
+  imbanganDuga: { statement: null, reference: null },
+  ledger: { statement: null, reference: null },
+  bankReconciliation: { statement: null, reference: null }
+});
+
+// Update handleFileChange to handle both statement and reference files
+const handleFileChange = (event, type, fileType) => {
+  const files = event.target.files;
+  if (files.length > 0) {
+    const file = files[0];
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (fileAttachments.value[type]) {
+        fileAttachments.value[type][fileType] = e.target.result;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// Update uploadDocument function to handle both files
+const uploadDocument = async (type) => {
+  if (!kooperasiDetails.value.subsidiariKoperasi && !isParentOrganization.value) {
+    alert('Sila pilih anak syarikat terlebih dahulu');
+    return;
+  }
+
+  if (!fileAttachments.value[type].statement) {
+    alert('Sila pilih fail untuk dimuat naik');
+    return;
+  }
+
+  uploadStatus.value[type].loading = true;
+  uploadStatus.value[type].error = null;
+
+  try {
+    const formData = {
+      type,
+      organization_id: kooperasiDetails.value.subsidiariKoperasi,
+      year_current: kooperasiDetails.value.tahunKewanganSemasa,
+      year_previous: kooperasiDetails.value.tahunKewanganSebelum,
+      state: kooperasiDetails.value.negeri,
+      audited_by: kooperasiDetails.value.diauditOleh,
+      reviewed_by: kooperasiDetails.value.disemakOleh,
+      statement_file: fileAttachments.value[type].statement,
+      reference_file: fileAttachments.value[type].reference
+    };
+
+    const response = await $fetch('/api/financial-statement/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (response.status === 'success') {
+      alert('Dokumen berjaya dimuat naik');
+      nextSection();
+      // Clear attachments after successful upload
+      fileAttachments.value[type] = { statement: null, reference: null };
+    } else {
+      throw new Error(response.message || 'Failed to upload document');
+    }
+  } catch (error) {
+    console.error(`Error uploading ${type}:`, error);
+    uploadStatus.value[type].error = error.message || 'Gagal memuat naik dokumen';
+    alert(uploadStatus.value[type].error);
+  } finally {
+    uploadStatus.value[type].loading = false;
+  }
+};
+
+// Update upload handlers to not pass formRef
+const uploadKunciKiraKira = () => uploadDocument('kunciKiraKira');
+const uploadImbanganDuga = () => uploadDocument('imbanganDuga');
+const uploadLedger = () => uploadDocument('ledger');
+const uploadBankReconciliation = () => uploadDocument('bankReconciliation');
 
 const processDocuments = () => {
   // Logic to process the uploaded documents and map them to the ledger
@@ -109,16 +250,6 @@ const isReviewVisible = computed(() => {
   return accountingDocuments.value.kunciKiraKira && accountingDocuments.value.kunciKiraKiraFailRujukan;
 });
 
-const kooperasiDetails = ref({
-  namaKoperasi: '',
-  subsidiariKoperasi: '',
-  negeri: '',
-  tahunKewanganSemasa: '',
-  tahunKewanganSebelum: '',
-  diauditOleh: '',
-  disemakOleh: ''
-});
-
 // Add new data for dropdowns
 const kooperasiList = ref([
   { id: 1, name: 'Koperasi Permodalan Felda Malaysia Berhad', hasSubsidiaries: true },
@@ -127,28 +258,36 @@ const kooperasiList = ref([
   { id: 4, name: 'Bank Kerjasama Rakyat Malaysia Berhad', hasSubsidiaries: true },
 ]);
 
-const subsidiariList = ref({
-  1: [ // Felda subsidiaries
-    'Felda Trading Sdn Bhd',
-    'Felda Investment Corporation',
-    'Felda Global Ventures Holdings'
-  ],
-  3: [ // Koperasi Serbaguna subsidiaries
-    'Iman Developments Sdn Bhd',
-    'Iman Properties Berhad'
-  ],
-  4: [ // Bank Rakyat subsidiaries
-    'Rakyat Holdings Sdn Bhd',
-    'Rakyat Management Services'
-  ]
-});
+const PARENT_ORGANIZATION_ID = '3df46589-5c74-45d2-a436-4291ddc6fdde'
 
-const selectedKoperasi = ref(null);
-const showSubsidiaries = computed(() => {
-  if (!selectedKoperasi.value) return false;
-  const selected = kooperasiList.value.find(k => k.id === selectedKoperasi.value);
-  return selected?.hasSubsidiaries;
-});
+// Remove the static subsidiariList since we'll fetch from API
+const subsidiaries = ref([])
+
+// Fetch subsidiaries from API
+const fetchSubsidiaries = async () => {
+  try {
+    const response = await $fetch(`/api/organization/${PARENT_ORGANIZATION_ID}`)
+    if (response?.status === 'success' && response?.data?.children) {
+      subsidiaries.value = response.data.children
+    }
+  } catch (error) {
+    console.error('Error fetching subsidiaries:', error)
+  }
+}
+
+// Update subsidiaries data structure to use API data
+const subsidiaryOptions = computed(() => {
+  return subsidiaries.value.map(subsidiary => ({
+    label: subsidiary.name,
+    value: subsidiary.id
+  }))
+})
+
+// Initialize data on component mount
+onMounted(async () => {
+  initializeSection()
+  await fetchSubsidiaries()
+})
 
 // Add Malaysian states data
 const malaysianStates = ref([
@@ -186,6 +325,13 @@ const reviewersList = ref([
   { id: 4, name: 'Wong Kai Ling', position: 'Senior Reviewer' },
   { id: 5, name: 'Amirah binti Zulkifli', position: 'Lead Reviewer' }
 ]);
+
+const selectedKoperasi = ref(null);
+const showSubsidiaries = computed(() => {
+  if (!selectedKoperasi.value) return false;
+  const selected = kooperasiList.value.find(k => k.id === selectedKoperasi.value);
+  return selected?.hasSubsidiaries;
+});
 </script>
 
 <template>
@@ -214,25 +360,36 @@ const reviewersList = ref([
           <h2 class="text-xl font-semibold my-4">Butiran Koperasi</h2>
           <Card class="p-2">
             <CardContent>
+              <!-- Organization Type Selection -->
               <FormKit
-                type="select"
-                label="Nama Koperasi"
-                v-model="selectedKoperasi"
-                :options="kooperasiList.map(k => ({ label: k.name, value: k.id }))"
-                placeholder="Pilih Koperasi"
+                type="radio"
+                label="Jenis Organisasi"
+                v-model="isParentOrganization"
+                :options="organizationTypeOptions"
                 class="w-full mb-4"
               />
-              
+              <!-- Subsidiary Selection (Only visible when not parent organization) -->
               <FormKit
-                v-if="showSubsidiaries"
+                v-if="!isParentOrganization"
                 type="select"
-                label="Subsidiari Koperasi"
+                label="Pilih Anak Syarikat"
                 v-model="kooperasiDetails.subsidiariKoperasi"
-                :options="subsidiariList[selectedKoperasi]?.map(s => ({ label: s, value: s })) || []"
-                placeholder="Pilih Subsidiari"
+                :options="subsidiaryOptions"
+                :disabled="subsidiaryOptions.length === 0"
+                placeholder="Pilih Anak Syarikat"
+                validation="required"
+                validation-visibility="live"
+                :validation-messages="{
+                  required: 'Sila pilih anak syarikat'
+                }"
                 class="w-full mb-4"
               />
+              <div v-if="!isParentOrganization && subsidiaryOptions.length === 0" 
+                   class="text-sm text-gray-500 mb-4">
+                Tiada anak syarikat dijumpai
+              </div>
               
+              <!-- Rest of the form fields -->
               <FormKit
                 type="select"
                 label="Negeri"
@@ -283,8 +440,53 @@ const reviewersList = ref([
           <h2 class="text-xl font-semibold my-4">Kunci Kira Kira</h2>
           <Card class="p-2">
             <CardContent>
-              <FormKit type="file" label="Kunci Kira Kira" v-model="accountingDocuments.kunciKiraKira" class="w-full mb-4" />
-              <FormKit type="file" label="Fail Rujukan" v-model="accountingDocuments.kunciKiraKiraFailRujukan" class="w-full" />
+              <FormKit
+                type="form"
+                id="kunciKiraKiraForm"
+                :actions="false"
+                @submit="uploadKunciKiraKira"
+                :disabled="uploadStatus.kunciKiraKira.loading"
+                method="post"
+              >
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'kunciKiraKira', 'statement')"
+                  id="statement"
+                  accept=".xlsx"
+                  :multiple="false"
+                  label="Muat Naik Fail Excel"
+                  validation="required"
+                  :validation-messages="{
+                    required: 'Sila pilih fail untuk dimuat naik'
+                  }"
+                  class="w-full mb-4"
+                />
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'kunciKiraKira', 'reference')"
+                  id="reference"
+                  accept=".txt"
+                  :multiple="false"
+                  label="Muat Naik Fail Rujukan"
+                  class="w-full mb-4"
+                />
+                <div class="flex justify-end">
+                  <Button
+                    type="submit"
+                    :disabled="uploadStatus.kunciKiraKira.loading"
+                    class="btn"
+                  >
+                    <Icon
+                      :name="uploadStatus.kunciKiraKira.loading ? 'eos-icons:loading' : 'material-symbols:upload'"
+                      class="mr-2"
+                    />
+                    {{ uploadStatus.kunciKiraKira.loading ? 'Memuat Naik...' : 'Muat Naik' }}
+                  </Button>
+                </div>
+                <p v-if="uploadStatus.kunciKiraKira.error" class="text-red-500 mt-2">
+                  {{ uploadStatus.kunciKiraKira.error }}
+                </p>
+              </FormKit>
             </CardContent>
           </Card>
           <template v-if="isReviewVisible">
@@ -294,16 +496,16 @@ const reviewersList = ref([
                 <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
               </div>
 
-              <div v-for="(section, sectionIndex) in documentReview.kunciKiraKira.sections" 
-                   :key="sectionIndex" 
+              <div v-for="(section, sectionIndex) in documentReview.kunciKiraKira.sections"
+                   :key="sectionIndex"
                    class="bg-white rounded-lg shadow-sm border border-slate-200">
                 <div class="p-4 border-b border-slate-200 bg-slate-50">
                   <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
                 </div>
                 
                 <div class="p-4 space-y-4">
-                  <div v-for="(issue, issueIndex) in section.issues" 
-                       :key="issueIndex" 
+                  <div v-for="(issue, issueIndex) in section.issues"
+                       :key="issueIndex"
                        class="bg-white rounded-lg p-4 border border-slate-200">
                     <div class="flex items-center gap-2 mb-3">
                       <div :class="{
@@ -393,15 +595,53 @@ const reviewersList = ref([
           <h2 class="text-xl font-semibold my-4">Imbangan Duga</h2>
           <Card class="mb-4">
             <CardContent>
-              <FormKit type="file" label="Imbangan Duga" v-model="accountingDocuments.imbanganDuga" class="w-full mb-4" />
-              <FormKit type="file" label="Fail Rujukan" v-model="accountingDocuments.imbanganDugaFailRujukan" class="w-full mb-4" />
-            </CardContent>
-          </Card>
-          <Card class="mt-4">
-            <CardContent>
-              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
-              <p v-if="accountingDocuments.imbanganDuga">Imbangan Duga: {{ accountingDocuments.imbanganDuga.name }}</p>
-              <p v-if="accountingDocuments.imbanganDugaFailRujukan">Fail Rujukan: {{ accountingDocuments.imbanganDugaFailRujukan.name }}</p>
+              <FormKit
+                type="form"
+                id="imbanganDugaForm"
+                :actions="false"
+                @submit="uploadImbanganDuga"
+                :disabled="uploadStatus.imbanganDuga.loading"
+                method="post"
+              >
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'imbanganDuga', 'statement')"
+                  id="statement"
+                  accept=".xlsx"
+                  :multiple="false"
+                  label="Muat Naik Fail Excel"
+                  validation="required"
+                  :validation-messages="{
+                    required: 'Sila pilih fail untuk dimuat naik'
+                  }"
+                  class="w-full mb-4"
+                />
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'imbanganDuga', 'reference')"
+                  id="reference"
+                  accept=".txt"
+                  :multiple="false"
+                  label="Muat Naik Fail Rujukan"
+                  class="w-full mb-4"
+                />
+                <div class="flex justify-end">
+                  <Button
+                    type="submit"
+                    :disabled="uploadStatus.imbanganDuga.loading"
+                    class="btn"
+                  >
+                    <Icon
+                      :name="uploadStatus.imbanganDuga.loading ? 'eos-icons:loading' : 'material-symbols:upload'"
+                      class="mr-2"
+                    />
+                    {{ uploadStatus.imbanganDuga.loading ? 'Memuat Naik...' : 'Muat Naik' }}
+                  </Button>
+                </div>
+                <p v-if="uploadStatus.imbanganDuga.error" class="text-red-500 mt-2">
+                  {{ uploadStatus.imbanganDuga.error }}
+                </p>
+              </FormKit>
             </CardContent>
           </Card>
         </div>
@@ -410,15 +650,53 @@ const reviewersList = ref([
           <h2 class="text-xl font-semibold my-4">Ledger</h2>
           <Card class="mb-4">
             <CardContent>
-              <FormKit type="file" label="Ledger" v-model="accountingDocuments.ledger" class="w-full mb-4" />
-              <FormKit type="file" label="Fail Rujukan" v-model="accountingDocuments.ledgerFailRujukan" class="w-full mb-4" />
-            </CardContent>
-          </Card>
-          <Card class="mt-4">
-            <CardContent>
-              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
-              <p v-if="accountingDocuments.ledger">Ledger: {{ accountingDocuments.ledger.name }}</p>
-              <p v-if="accountingDocuments.ledgerFailRujukan">Fail Rujukan: {{ accountingDocuments.ledgerFailRujukan.name }}</p>
+              <FormKit
+                type="form"
+                id="ledgerForm"
+                :actions="false"
+                @submit="uploadLedger"
+                :disabled="uploadStatus.ledger.loading"
+                method="post"
+              >
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'ledger', 'statement')"
+                  id="statement"
+                  accept=".xlsx"
+                  :multiple="false"
+                  label="Muat Naik Fail Excel"
+                  validation="required"
+                  :validation-messages="{
+                    required: 'Sila pilih fail untuk dimuat naik'
+                  }"
+                  class="w-full mb-4"
+                />
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'ledger', 'reference')"
+                  id="reference"
+                  accept=".txt"
+                  :multiple="false"
+                  label="Muat Naik Fail Rujukan"
+                  class="w-full mb-4"
+                />
+                <div class="flex justify-end">
+                  <Button
+                    type="submit"
+                    :disabled="uploadStatus.ledger.loading"
+                    class="btn"
+                  >
+                    <Icon
+                      :name="uploadStatus.ledger.loading ? 'eos-icons:loading' : 'material-symbols:upload'"
+                      class="mr-2"
+                    />
+                    {{ uploadStatus.ledger.loading ? 'Memuat Naik...' : 'Muat Naik' }}
+                  </Button>
+                </div>
+                <p v-if="uploadStatus.ledger.error" class="text-red-500 mt-2">
+                  {{ uploadStatus.ledger.error }}
+                </p>
+              </FormKit>
             </CardContent>
           </Card>
         </div>
@@ -427,15 +705,53 @@ const reviewersList = ref([
           <h2 class="text-xl font-semibold my-4">Penyelarasan Bank</h2>
           <Card class="mb-4">
             <CardContent>
-              <FormKit type="file" label="Penyelarasan Bank" v-model="accountingDocuments.bankReconciliation" class="w-full mb-4" />
-              <FormKit type="file" label="Fail Rujukan" v-model="accountingDocuments.bankReconciliationFailRujukan" class="w-full mb-4" />
-            </CardContent>
-          </Card>
-          <Card class="mt-4">
-            <CardContent>
-              <h3 class="text-lg font-semibold">Semakan Dokumen Semasa</h3>
-              <p v-if="accountingDocuments.bankReconciliation">Penyelarasan Bank: {{ accountingDocuments.bankReconciliation.name }}</p>
-              <p v-if="accountingDocuments.bankReconciliationFailRujukan">Fail Rujukan: {{ accountingDocuments.bankReconciliationFailRujukan.name }}</p>
+              <FormKit
+                type="form"
+                id="bankReconciliationForm"
+                :actions="false"
+                @submit="uploadBankReconciliation"
+                :disabled="uploadStatus.bankReconciliation.loading"
+                method="post"
+              >
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'bankReconciliation', 'statement')"
+                  id="statement"
+                  accept=".xlsx"
+                  :multiple="false"
+                  label="Muat Naik Fail Excel"
+                  validation="required"
+                  :validation-messages="{
+                    required: 'Sila pilih fail untuk dimuat naik'
+                  }"
+                  class="w-full mb-4"
+                />
+                <FormKit
+                  type="file"
+                  @change="(event) => handleFileChange(event, 'bankReconciliation', 'reference')"
+                  id="reference"
+                  accept=".txt"
+                  :multiple="false"
+                  label="Muat Naik Fail Rujukan"
+                  class="w-full mb-4"
+                />
+                <div class="flex justify-end">
+                  <Button
+                    type="submit"
+                    :disabled="uploadStatus.bankReconciliation.loading"
+                    class="btn"
+                  >
+                    <Icon
+                      :name="uploadStatus.bankReconciliation.loading ? 'eos-icons:loading' : 'material-symbols:upload'"
+                      class="mr-2"
+                    />
+                    {{ uploadStatus.bankReconciliation.loading ? 'Memuat Naik...' : 'Muat Naik' }}
+                  </Button>
+                </div>
+                <p v-if="uploadStatus.bankReconciliation.error" class="text-red-500 mt-2">
+                  {{ uploadStatus.bankReconciliation.error }}
+                </p>
+              </FormKit>
             </CardContent>
           </Card>
         </div>
@@ -497,12 +813,12 @@ const reviewersList = ref([
                 </div>
               </div>
               <div class="p-4">
-                <div v-for="(section, index) in documentReview.kunciKiraKira.sections" 
+                <div v-for="(section, index) in documentReview.kunciKiraKira.sections"
                      :key="index"
                      class="mb-4 last:mb-0">
                   <h4 class="font-medium text-slate-700 mb-2">{{ section.section }}</h4>
                   <div class="space-y-3">
-                    <div v-for="(issue, issueIndex) in section.issues" 
+                    <div v-for="(issue, issueIndex) in section.issues"
                          :key="issueIndex"
                          class="bg-slate-50 p-3 rounded-lg">
                       <div class="flex items-center gap-2 mb-2">
