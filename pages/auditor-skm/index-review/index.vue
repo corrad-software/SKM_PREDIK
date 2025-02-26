@@ -9,7 +9,7 @@ const documentSections = ref([
   {
     title: 'Indeks Dokumen Koperasi',
     items: [
-      { name: 'Indeks Kertas Kerja', icon: 'ic:round-article', path: '/auditor-skm/index-review/kertas-kerja' },
+      { name: 'Indeks Kertas Kerja', icon: 'ic:round-article', path: '/ahli-kooperasi/index-review/kertas-kerja' },
       { 
         name: 'Penyata Kewangan Teraudit Koperasi', 
         icon: 'ic:round-description', 
@@ -19,19 +19,19 @@ const documentSections = ref([
           { 
             name: 'Kunci Kira-Kira',
             icon: 'ic:round-account-balance',
-            path: '/auditor-skm/index-review/kunci-kira-kira'
+            path: '/ahli-kooperasi/index-review/kunci-kira-kira'
           },
           { 
             name: 'Akaun Pembahagian Keuntungan',
-            path: '/auditor-skm/index-review/akaun-pembahagian-keuntungan'
+            path: '/ahli-kooperasi/index-review/akaun-pembahagian-keuntungan'
           },
           { 
             name: 'Akaun Untung Rugi',
-            path: '/auditor-skm/index-review/akaun-untung-rugi'
+            path: '/ahli-kooperasi/index-review/akaun-untung-rugi'
           },
           { 
             name: 'Akaun Perdagangan',
-            path: '/auditor-skm/index-review/akaun-perdagangan',
+            path: '/ahli-kooperasi/index-review/akaun-perdagangan',
             isExpanded: false,
             subItems: [
               { name: 'Pemborong / Peruncitan', path: '/akaun-perdagangan/pemborong-peruncitan' },
@@ -77,21 +77,21 @@ const documentSections = ref([
   }
 ]);
 
-const selectedCooperative = ref(null);
-const selectedSubsidiary = ref(null);
-
-const cooperatives = ref([
-  { name: 'Cooperative 1', subsidiaries: ['Subsidiary 1.1', 'Subsidiary 1.2'] },
-  { name: 'Cooperative 2', subsidiaries: ['Subsidiary 2.1', 'Subsidiary 2.2'] }
-]);
-
-const subsidiaries = computed(() => {
-  const cooperative = cooperatives.value.find(c => c.name === selectedCooperative.value);
-  return cooperative ? cooperative.subsidiaries : [];
-});
-
 // Add search functionality
 const filteredItems = computed(() => {
+  if (!searchQuery.value) return documentSections.value[0].items;
+  
+  const query = searchQuery.value.toLowerCase();
+  return documentSections.value[0].items.filter(item => {
+    const matchesName = item.name.toLowerCase().includes(query);
+    const hasMatchingSubItems = item.subItems?.some(subItem => 
+      subItem.name.toLowerCase().includes(query) ||
+      subItem.subItems?.some(nestedItem => 
+        nestedItem.name.toLowerCase().includes(query)
+      )
+    );
+    return matchesName || hasMatchingSubItems;
+  });
 });
 </script>
 
