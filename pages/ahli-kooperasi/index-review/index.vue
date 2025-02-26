@@ -80,7 +80,7 @@ const documentSections = ref([
           { name: 'Nota Lain-Lain', icon: 'ic:round-notes', path: '/nota-lain' }
         ]
       },
-      { name: 'Memo Panduan Kerja Audit (MPKA)', icon: 'ic:round-work', path: '/mpka' },
+      { name: 'Memo Panduan Kerja Audit (MPKA)', icon: 'ic:round-work', path: '/ahli-kooperasi/index-review/mpka' },
       { name: 'Jurnal Pelarasan Audit (JPA)', icon: 'ic:round-edit-note', path: '/jpa' },
       { name: 'Laporan Juruaudit', icon: 'ic:round-assessment', path: '/laporan-juruaudit' },
       { name: 'Laporan Pengurusan', icon: 'ic:round-manage-accounts', path: '/laporan-pengurusan' },
