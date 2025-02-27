@@ -408,7 +408,7 @@ ARAHAN UNTUK PERSAMPELAN AUDIT:
               "Struktur lengkap lejar koperasi dengan penilaian risiko, materialiti, dan persampelan audit",
             messages: messages,
             temperature: 0.1,
-            maxTokens: 4000,
+            maxTokens: 16384,
             presencePenalty: 0,
             frequencyPenalty: 0,
             topP: 0.1,

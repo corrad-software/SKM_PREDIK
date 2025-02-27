@@ -67,6 +67,13 @@ export default defineEventHandler(async (event) => {
             updated_at,
             analysis_result
           )
+        ),
+        ledger_generation_jobs (
+          id,
+          status,
+          result,
+          created_at,
+          updated_at
         )
       `)
       .eq('organization_id', organization_id)
@@ -105,6 +112,11 @@ export default defineEventHandler(async (event) => {
         };
       }) || [];
 
+      // Get the latest successful ledger job
+      const latestSuccessfulJob = group.ledger_generation_jobs?.find(job => 
+        job.status === 'completed' && job.result
+      );
+
       return {
         id: group.id,
         name: group.name,
@@ -122,7 +134,12 @@ export default defineEventHandler(async (event) => {
             total_minor_issues: items.reduce((sum, item) => 
               sum + (item.statement?.issues?.minor || 0), 0)
           }
-        }
+        },
+        existing_ledger: latestSuccessfulJob ? {
+          job_id: latestSuccessfulJob.id,
+          generated_at: latestSuccessfulJob.updated_at,
+          result: latestSuccessfulJob.result
+        } : null
       };
     });
 

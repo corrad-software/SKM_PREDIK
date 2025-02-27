@@ -79,6 +79,18 @@ export default defineEventHandler(async (event) => {
             file_path,
             file_url
           )
+        ),
+        statement_groups (
+          id,
+          name,
+          description,
+          ledger_generation_jobs (
+            id,
+            status,
+            result,
+            created_at,
+            updated_at
+          )
         )
       `)
       .eq('id', id)
@@ -148,6 +160,24 @@ export default defineEventHandler(async (event) => {
       [DOCUMENT_TYPES.BANK_RECON]: statements.some(s => s.statement_type === DOCUMENT_TYPES.BANK_RECON)
     };
 
+    // Process statement groups and ledger jobs
+    const statementGroups = organization.statement_groups?.map(group => {
+      const latestSuccessfulJob = group.ledger_generation_jobs?.find(job => 
+        job.status === 'completed' && job.result
+      );
+
+      return {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        existing_ledger: latestSuccessfulJob ? {
+          job_id: latestSuccessfulJob.id,
+          generated_at: latestSuccessfulJob.updated_at,
+          result: latestSuccessfulJob.result
+        } : null
+      };
+    }) || [];
+
     return {
       status: "success",
       data: {
@@ -170,7 +200,8 @@ export default defineEventHandler(async (event) => {
             return acc;
           }, {}),
           uploaded_documents: uploadedDocuments
-        }
+        },
+        statement_groups: statementGroups
       }
     };
 

@@ -16,6 +16,7 @@ const showLedger = ref(false);
 const selectedGroup = ref(null);
 const generationStatus = ref(null);
 const statementGroups = ref([]);
+const selectedGroupData = ref(null);
 
 // Panel visibility state
 const isRiskPanelOpen = ref(false);
@@ -25,6 +26,10 @@ const isAuditSamplingPanelOpen = ref(false);
 // Add reactive variables for job tracking
 const generationJobId = ref(null);
 const statusCheckInterval = ref(null);
+
+// Add new refs for viewing ledger
+const viewingExistingLedger = ref(false);
+const existingLedgerData = ref(null);
 
 // Fetch organizations from API
 const { data: organizationResponse } = await useFetch('/api/organization/list', {
@@ -136,8 +141,13 @@ watch(selectedAnakSyarikat, async (newValue) => {
   }
 });
 
-watch(selectedGroup, () => {
+watch(selectedGroup, (newValue) => {
   showLedger.value = false;
+  if (newValue) {
+    selectedGroupData.value = statementGroups.value.find(g => g.id === newValue);
+  } else {
+    selectedGroupData.value = null;
+  }
 });
 
 // Function to store job ID in localStorage
@@ -206,6 +216,7 @@ const generateLedger = async () => {
   error.value = null;
   generationStatus.value = null;
   showLedger.value = false;
+  viewingExistingLedger.value = false;
 
   try {
     const response = await $fetch('/api/financial-statement/generate-ledger', {
@@ -518,6 +529,30 @@ const auditSamplingData = ref({
     }
   ]
 });
+
+// Function to view existing ledger
+const viewExistingLedger = async () => {
+  if (!selectedGroupData.value?.existing_ledger) return;
+  
+  loading.value = true;
+  error.value = null;
+  viewingExistingLedger.value = true;
+  
+  try {
+    // Load the existing ledger data
+    const existingLedger = selectedGroupData.value.existing_ledger;
+    ledgerData.value = existingLedger.result.ledger;
+    riskAssessment.value = existingLedger.result.riskAssessment;
+    materialityData.value = existingLedger.result.materiality;
+    auditSamplingData.value = existingLedger.result.auditSampling;
+    showLedger.value = true;
+  } catch (err) {
+    error.value = 'Failed to load existing ledger';
+    console.error('Error loading existing ledger:', err);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -575,6 +610,16 @@ const auditSamplingData = ref({
             <span v-if="loading" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
             <span>{{ loading ? 'Menjana...' : 'Jana Lejar' }}</span>
           </button>
+          <!-- Add View Existing Ledger button -->
+          <button 
+            v-if="selectedGroupData?.existing_ledger"
+            @click="viewExistingLedger"
+            :disabled="loading"
+            class="mt-2 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            <span v-if="loading" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+            <span>{{ loading ? 'Memuat...' : 'Lihat Lejar Sedia Ada' }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -608,9 +653,9 @@ const auditSamplingData = ref({
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-green-800">Berjaya</h3>
+            <h3 class="text-sm font-medium text-green-800">{{ viewingExistingLedger ? 'Lejar Sedia Ada Dimuat' : 'Lejar Berjaya Dijana' }}</h3>
             <div class="mt-2 text-sm text-green-700">
-              <p>Lejar berjaya dijana</p>
+              <p>{{ viewingExistingLedger ? 'Lejar sedia ada telah berjaya dimuat.' : 'Lejar baru telah berjaya dijana.' }}</p>
             </div>
           </div>
         </div>
