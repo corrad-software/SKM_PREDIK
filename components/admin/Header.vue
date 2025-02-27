@@ -36,7 +36,7 @@ const unreadCount = 2;
       :class="[isRTL ? 'mr-auto' : 'ml-auto']"
     >
       <!-- Theme Switcher -->
-      <ThemeSwitcher />
+      <!-- <ThemeSwitcher /> -->
 
       <!-- Notification -->
       <!-- <Dropdown>

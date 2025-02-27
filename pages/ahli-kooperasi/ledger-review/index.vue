@@ -1,7 +1,41 @@
 <script setup>
+import { onMounted, watch, onUnmounted } from 'vue';
+
 definePageMeta({
   layout: "admin",
 });
+
+// Move all reactive declarations to the top
+const searchQuery = ref('');
+const isParentOrganization = ref(true);
+const selectedKoperasi = ref(null);
+const selectedAnakSyarikat = ref(null);
+const subsidiaries = ref([]);
+const loading = ref(false);
+const error = ref(null);
+const showAnakSyarikat = ref(false);
+const showLedger = ref(false);
+const selectedLedger = ref('');
+const statementGroups = ref([]);
+const selectedGroup = ref(null);
+const generationStatus = ref(null);
+const generationJobId = ref(null);
+const statusCheckInterval = ref(null);
+
+// Constants
+const PARENT_ORGANIZATION_ID = '62986bb9-b23c-4226-93c9-be523adabf77';
+
+// Organization type options
+const organizationTypeOptions = [
+  { label: 'Koperasi Induk', value: true },
+  { label: 'Anak Syarikat', value: false }
+];
+
+// Sample data for ledgers
+const ledgers = ref([
+  { id: 1, name: 'PENYATA KEWANGAN : 31 DISEMBER 20XX' },
+  { id: 2, name: 'PENYATA KEWANGAN : 31 DISEMBER 20YY' }
+]);
 
 // Add reactive data for the ledger
 const ledgerData = ref({
@@ -217,24 +251,189 @@ const toggleAuditSamplingPanel = () => {
 
 // Add reactive data for cooperative and ledger selection
 const selectedCooperative = ref('');
-const selectedLedger = ref('');
-const showAnakSyarikat = ref(false);
-const showLedger = ref(false);
 
-const janaLejar = () => {
-  showLedger.value = true;
+// Add after the reactive declarations
+const COOKIE_KEY = 'ledger_generation_job';
+
+// Create a cookie to store the job data with 24 hour expiry
+const jobCookie = useCookie(COOKIE_KEY, {
+  maxAge: 60 * 60 * 24, // 24 hours in seconds
+  default: () => null,
+});
+
+// Add function to store job ID
+const storeJobId = (groupId, jobId) => {
+  jobCookie.value = {
+    group_id: groupId,
+    job_id: jobId,
+    timestamp: new Date().getTime()
+  };
 };
+
+// Add function to retrieve stored job
+const getStoredJob = () => {
+  const stored = jobCookie.value;
+  if (!stored) return null;
+
+  const hoursSinceStored = (new Date().getTime() - stored.timestamp) / (1000 * 60 * 60);
+  
+  // Clear if older than 24 hours
+  if (hoursSinceStored > 24) {
+    clearStoredJob();
+    return null;
+  }
+
+  return { group_id: stored.group_id, job_id: stored.job_id };
+};
+
+// Add function to clear stored job
+const clearStoredJob = () => {
+  jobCookie.value = null;
+};
+
+// Update the checkGenerationStatus function
+const checkGenerationStatus = async () => {
+  try {
+    if (!generationJobId.value) return;
+
+    const response = await $fetch('/api/financial-statement/check-ledger-status', {
+      method: 'POST',
+      body: {
+        job_id: generationJobId.value
+      }
+    });
+
+    generationStatus.value = response;
+
+    if (response.status === 'success') {
+      // Clear interval and storage when generation is complete
+      if (statusCheckInterval.value) {
+        clearInterval(statusCheckInterval.value);
+        statusCheckInterval.value = null;
+      }
+      clearStoredJob();
+      
+      // Update ledger data with the generated result
+      if (response.data?.result) {
+        ledgerData.value = response.data.result.ledger;
+        riskAssessment.value = response.data.result.riskAssessment;
+        materialityData.value = response.data.result.materiality;
+        auditSamplingData.value = response.data.result.auditSampling;
+        showLedger.value = true;
+      }
+    } else if (response.status === 'error') {
+      // Clear interval and storage on error
+      if (statusCheckInterval.value) {
+        clearInterval(statusCheckInterval.value);
+        statusCheckInterval.value = null;
+      }
+      clearStoredJob();
+      error.value = response.data.error;
+    }
+  } catch (err) {
+    console.error('Error checking generation status:', err);
+    error.value = 'Ralat semasa menyemak status penjanaan';
+  }
+};
+
+// Update the janaLejar function
+const janaLejar = async () => {
+  if (selectedGroup.value) {
+    try {
+      loading.value = true;
+      error.value = null;
+      generationStatus.value = null;
+      showLedger.value = false;
+
+      // Start ledger generation
+      const response = await $fetch('/api/financial-statement/generate-ledger', {
+        method: 'POST',
+        body: {
+          group_id: selectedGroup.value.id
+        }
+      });
+
+      if (response.status === 'success') {
+        generationJobId.value = response.data.job_id;
+        // Store the job ID
+        storeJobId(selectedGroup.value.id, response.data.job_id);
+        
+        // Start polling for status
+        if (statusCheckInterval.value) {
+          clearInterval(statusCheckInterval.value);
+        }
+        statusCheckInterval.value = setInterval(checkGenerationStatus, 2000);
+      } else {
+        throw new Error(response.message || 'Ralat semasa memulakan penjanaan');
+      }
+    } catch (err) {
+      console.error('Error generating ledger:', err);
+      error.value = err.message || 'Ralat semasa memulakan penjanaan';
+    } finally {
+      loading.value = false;
+    }
+  }
+};
+
+// Add check for stored job on mount
+onMounted(async () => {
+  const storedJob = getStoredJob();
+  if (storedJob && selectedGroup.value?.id === storedJob.group_id) {
+    generationJobId.value = storedJob.job_id;
+    // Start polling for status
+    statusCheckInterval.value = setInterval(checkGenerationStatus, 2000);
+  }
+});
+
+// Reset ledger view when organization type changes
+watch(isParentOrganization, (newValue) => {
+  selectedKoperasi.value = newValue ? PARENT_ORGANIZATION_ID : null;
+  selectedAnakSyarikat.value = null;
+  showLedger.value = false;
+  selectedGroup.value = null;
+  statementGroups.value = [];
+  
+  // Fetch subsidiaries when switching to Anak Syarikat
+  if (!newValue) {
+    fetchSubsidiaries();
+  } else {
+    // Fetch statement groups for parent organization
+    fetchStatementGroups(PARENT_ORGANIZATION_ID);
+  }
+});
+
+// Watch for changes in selected koperasi
+watch(selectedKoperasi, async (newValue) => {
+  if (newValue) {
+    await fetchStatementGroups(newValue);
+  } else {
+    statementGroups.value = [];
+  }
+});
+
+// Handle group selection
+const selectGroup = (group) => {
+  selectedGroup.value = group;
+  // Don't show ledger until Jana Lejar is clicked
+  if (group) {
+    ledgerData.value.title = group.name;
+    ledgerData.value.subtitle = group.description || 'PENYATA KEWANGAN';
+  }
+};
+
+// Set initial parent organization ID and fetch groups on mount
+onMounted(async () => {
+  if (isParentOrganization.value) {
+    selectedKoperasi.value = PARENT_ORGANIZATION_ID;
+    await fetchStatementGroups(PARENT_ORGANIZATION_ID);
+  }
+});
 
 // Sample data for cooperatives and ledgers
 const koperasiList = ref([
   { name: 'Koperasi A', anakSyarikat: ['Anak Syarikat A1', 'Anak Syarikat A2'] },
   { name: 'Koperasi B', anakSyarikat: [] },
   { name: 'Koperasi C', anakSyarikat: ['Anak Syarikat C1'] }
-]);
-
-const ledgers = ref([
-  { id: 1, name: 'PENYATA KEWANGAN : 31 DISEMBER 20XX' },
-  { id: 2, name: 'PENYATA KEWANGAN : 31 DISEMBER 20YY' }
 ]);
 
 // Function to handle cooperative selection
@@ -300,6 +499,52 @@ const auditSamplingData = ref({
     }
   ]
 });
+
+// Fetch subsidiaries for selected parent
+const fetchSubsidiaries = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    const response = await $fetch(`/api/organization/${PARENT_ORGANIZATION_ID}`, {
+      method: 'GET'
+    });
+    if (response.status === 'success' && response.data.children) {
+      subsidiaries.value = response.data.children;
+    } else {
+      throw new Error(response.message || 'Failed to fetch subsidiaries');
+    }
+  } catch (err) {
+    error.value = err.message;
+    console.error('Error fetching subsidiaries:', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Fetch statement groups for the selected organization
+const fetchStatementGroups = async (organizationId) => {
+  try {
+    loading.value = true;
+    error.value = null;
+    const response = await $fetch('/api/financial-statement/group/list', {
+      method: 'GET',
+      params: {
+        organization_id: organizationId
+      }
+    });
+    
+    if (response.status === 'success') {
+      statementGroups.value = response.data.groups;
+    } else {
+      throw new Error(response.message || 'Failed to fetch statement groups');
+    }
+  } catch (err) {
+    error.value = err.message;
+    console.error('Error fetching statement groups:', err);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -307,35 +552,129 @@ const auditSamplingData = ref({
     <!-- Add dropdowns for selecting cooperative and ledger -->
     <div class="p-4 bg-white shadow mb-4">
       <div class="flex space-x-4">
-        <div>
-          <label for="cooperative" class="block text-sm font-medium text-gray-700">Koperasi</label>
-          <select id="cooperative" v-model="selectedCooperative" @change="selectCooperative" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            <option value="">Pilih Koperasi</option>
-            <option v-for="koperasi in koperasiList" :key="koperasi.name" :value="koperasi.name">{{ koperasi.name }}</option>
+        <!-- Organization type selection -->
+        <div class="w-64">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Organisasi</label>
+          <div class="flex space-x-4">
+            <label v-for="option in organizationTypeOptions" :key="option.value" class="flex items-center space-x-2">
+              <input
+                type="radio"
+                :value="option.value"
+                v-model="isParentOrganization"
+                class="form-radio text-blue-500 h-4 w-4"
+              />
+              <span class="text-sm text-gray-700">{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+        <div v-if="!isParentOrganization">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Anak Syarikat</label>
+          <select 
+            v-model="selectedKoperasi" 
+            class="w-full p-2 border rounded" 
+            :disabled="loading"
+          >
+            <option disabled value="">Sila pilih anak syarikat</option>
+            <option 
+              v-for="sub in subsidiaries" 
+              :key="sub.id" 
+              :value="sub.id"
+            >
+              {{ sub.name }}
+            </option>
           </select>
         </div>
-        <div v-if="showAnakSyarikat">
-          <label for="anak-syarikat" class="block text-sm font-medium text-gray-700">Anak Syarikat</label>
-          <select id="anak-syarikat" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            <option value="">Pilih Anak Syarikat</option>
-            <option v-for="anakSyarikat in koperasiList.find(k => k.name === selectedCooperative)?.anakSyarikat || []" :key="anakSyarikat" :value="anakSyarikat">{{ anakSyarikat }}</option>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Lejar</label>
+          <select 
+            v-model="selectedGroup"
+            @change="selectGroup(selectedGroup)"
+            class="w-full p-2 border rounded min-w-[300px]"
+            :disabled="loading || (!isParentOrganization && !selectedKoperasi)"
+          >
+            <option disabled value="">Pilih Lejar</option>
+            <option 
+              v-for="group in statementGroups" 
+              :key="group.id" 
+              :value="group"
+            >
+              {{ group.name }}
+            </option>
           </select>
         </div>
         <div>
-          <label for="ledger" class="block text-sm font-medium text-gray-700">Lejar</label>
-          <select id="ledger" v-model="selectedLedger" @change="selectLedger" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            <option value="">Pilih Lejar</option>
-            <option v-for="ledger in ledgers" :key="ledger.id" :value="ledger.name">{{ ledger.name }}</option>
-          </select>
-        </div>
-        <div>
-          <button @click="janaLejar" class="mt-6 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Jana Lejar</button>
+          <button 
+            @click="janaLejar" 
+            class="mt-6 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            :disabled="!selectedGroup || loading"
+          >
+            <span v-if="loading || generationStatus?.status === 'pending'">
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </span>
+            <span>{{ loading || generationStatus?.status === 'pending' ? 'Menjana Lejar...' : 'Jana Lejar' }}</span>
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- Generation Status -->
+    <div v-if="generationStatus" class="mt-4">
+      <div v-if="generationStatus.status === 'pending'" class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 102 0V6z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-yellow-800">Sedang Menjana</h3>
+            <div class="mt-2 text-sm text-yellow-700">
+              <p>Sila tunggu sementara lejar sedang dijana...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="generationStatus.status === 'error'" class="bg-red-50 border border-red-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Ralat Penjanaan</h3>
+            <div class="mt-2 text-sm text-red-700">
+              <p>{{ generationStatus.data.error }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Display -->
+    <div v-if="error" class="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">Ralat</h3>
+          <div class="mt-2 text-sm text-red-700">
+            <p>{{ error }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showLedger">
-      <!-- Display ledger and review only if both cooperative and ledger are selected -->
-      <div v-if="selectedCooperative && selectedLedger">
+      <!-- Display ledger and review only if ledger is selected and jana lejar is clicked -->
+      <div v-if="selectedGroup">
         <!-- Add toggle buttons in the main content -->
         <div class="fixed top-20 right-4 z-10 flex space-x-2">
           <button @click="toggleRiskPanel" class="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-50 transition-colors duration-200">
@@ -560,7 +899,7 @@ const auditSamplingData = ref({
         </div>
 
         <!-- Backdrop -->
-        <div v-if="isRiskPanelOpen || isMaterialityPanelOpen || isAuditSamplingPanelOpen" 
+        <div v-if="isRiskPanelOpen || isMaterialityPanelOpen || isAuditSamplingPanel" 
             @click="toggleRiskPanel(); toggleMaterialityPanel(); toggleAuditSamplingPanel()"
             class="fixed inset-0 bg-black bg-opacity-25 transition-opacity duration-300 ease-in-out z-40">
         </div>

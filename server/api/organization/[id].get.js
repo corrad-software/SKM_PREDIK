@@ -21,14 +21,14 @@ const DOCUMENT_TYPES = {
   KUNCI_KIRA: 'kunci_kira_kira',
   IMBANGAN_DUGA: 'imbangan_duga',
   LEDGER: 'ledger',
-  BANK_RECON: 'bank_recon'
+  BANK_RECON: 'bank_reconciliation'
 };
 
 export default defineEventHandler(async (event) => {
   try {
     const id = event.context.params.id;
 
-    // Get organization details with relationships and financial statements
+    // Get organization details with relationships, financial statements, and current year
     const { data: organization, error: orgError } = await supabase
       .from('organizations')
       .select(`
@@ -71,6 +71,8 @@ export default defineEventHandler(async (event) => {
           uploaded_at,
           updated_at,
           analysis_result,
+          year_current,
+          year_previous,
           reference_file:reference_files!financial_statements_reference_file_id_fkey (
             id,
             file_name,
@@ -103,6 +105,11 @@ export default defineEventHandler(async (event) => {
       updated_at: child.child.updated_at
     })) || [];
 
+    // Get the most recent year from financial statements
+    const currentYear = organization.financial_statements?.reduce((latest, stmt) => {
+      return stmt.year_current > latest ? stmt.year_current : latest;
+    }, 0) || new Date().getFullYear();
+
     // Process financial statements
     const statements = (organization.financial_statements || []).map(stmt => {
       // Get public URL for the statement file
@@ -127,6 +134,8 @@ export default defineEventHandler(async (event) => {
         uploaded_at: stmt.uploaded_at,
         updated_at: stmt.updated_at,
         analysis_result: stmt.analysis_result,
+        year_current: stmt.year_current,
+        year_previous: stmt.year_previous,
         reference_file: referenceFile
       };
     });
@@ -150,6 +159,7 @@ export default defineEventHandler(async (event) => {
         status: organization.status,
         created_at: organization.created_at,
         updated_at: organization.updated_at,
+        current_year: currentYear,
         parent,
         children,
         statements: {

@@ -408,7 +408,7 @@ const documentSectionMap = {
   'kunci_kira_kira': 1,      // Section index for 'Kunci Kira Kira'
   'imbangan_duga': 2,   // Section index for 'Imbangan Duga'
   'ledger': 3,          // Section index for 'Ledger'
-  'bank_recon': 4  // Section index for 'Bank Reconciliation'
+  'bank_reconciliation': 4  // Section index for 'Bank Reconciliation'
 }
 
 const documentTypes = [
@@ -434,7 +434,7 @@ const documentTypes = [
     allowedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   },
   { 
-    id: 'bank_recon', 
+    id: 'bank_reconciliation', 
     name: 'Bank Reconciliation', 
     required: true,
     description: 'Penyesuaian penyata bank',

@@ -4,21 +4,124 @@ definePageMeta({
 });
 
 const searchQuery = ref('');
-
+const isParentOrganization = ref(true);
 const selectedKoperasi = ref(null);
 const selectedAnakSyarikat = ref(null);
+const subsidiaries = ref([]);
+const loading = ref(false);
+const error = ref(null);
+const financialGroups = ref([]);
 
-const koperasiOptions = [
-  { value: 'koperasi1', label: 'Koperasi 1' },
-  { value: 'koperasi2', label: 'Koperasi 2' }
+// Constants
+const PARENT_ORGANIZATION_ID = '62986bb9-b23c-4226-93c9-be523adabf77'; // Hardcoded parent organization ID
+
+// Organization type options
+const organizationTypeOptions = [
+  { label: 'Koperasi Induk', value: true },
+  { label: 'Anak Syarikat', value: false }
 ];
 
-const anakSyarikatOptions = computed(() => {
-  if (!selectedKoperasi.value) return [];
-  return [
-    { value: 'anak1', label: 'Anak Syarikat 1' },
-    { value: 'anak2', label: 'Anak Syarikat 2' }
-  ];
+// Add expanded state tracking
+const expandedGroups = ref(new Set());
+
+const toggleGroup = (groupId) => {
+  if (expandedGroups.value.has(groupId)) {
+    expandedGroups.value.delete(groupId);
+  } else {
+    expandedGroups.value.add(groupId);
+  }
+};
+
+// Fetch financial statement groups
+const fetchFinancialGroups = async (organizationId) => {
+  try {
+    loading.value = true;
+    error.value = null;
+    const response = await $fetch('/api/financial-statement/group/list', {
+      method: 'GET',
+      params: {
+        organization_id: organizationId
+      }
+    });
+    
+    if (response.status === 'success') {
+      financialGroups.value = response.data.groups;
+      showIndex.value = true;
+    } else {
+      throw new Error(response.message || 'Failed to fetch financial groups');
+    }
+  } catch (err) {
+    error.value = err.message;
+    console.error('Error fetching financial groups:', err);
+    showIndex.value = false;
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Fetch subsidiaries for selected parent
+const fetchSubsidiaries = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    const response = await $fetch(`/api/organization/${PARENT_ORGANIZATION_ID}`, {
+      method: 'GET'
+    });
+    if (response.status === 'success' && response.data.children) {
+      subsidiaries.value = response.data.children;
+    } else {
+      throw new Error(response.message || 'Failed to fetch subsidiaries');
+    }
+  } catch (err) {
+    error.value = err.message;
+    console.error('Error fetching subsidiaries:', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Watch for changes in organization type
+watch(isParentOrganization, (newValue) => {
+  selectedKoperasi.value = newValue ? PARENT_ORGANIZATION_ID : null;
+  selectedAnakSyarikat.value = null;
+  showIndex.value = false;
+  financialGroups.value = [];
+  
+  // Fetch subsidiaries when switching to Anak Syarikat
+  if (!newValue) {
+    fetchSubsidiaries();
+  }
+});
+
+const showIndex = ref(false);
+
+const handleSearch = async () => {
+  const organizationId = isParentOrganization.value ? PARENT_ORGANIZATION_ID : selectedKoperasi.value;
+  
+  if (organizationId) {
+    await fetchFinancialGroups(organizationId);
+  }
+};
+
+// Set initial parent organization ID on mount
+onMounted(() => {
+  if (isParentOrganization.value) {
+    selectedKoperasi.value = PARENT_ORGANIZATION_ID;
+  }
+});
+
+// Update the filteredGroups computed property
+const filteredGroups = computed(() => {
+  if (!searchQuery.value) return financialGroups.value;
+  
+  const query = searchQuery.value.toLowerCase();
+  return financialGroups.value.filter(group => {
+    const matchesName = group.name.toLowerCase().includes(query);
+    const hasMatchingItems = group.items.some(item => 
+      item.type.toLowerCase().includes(query)
+    );
+    return matchesName || hasMatchingItems;
+  });
 });
 
 const documentSections = ref([
@@ -35,7 +138,7 @@ const documentSections = ref([
           { 
             name: 'Kunci Kira-Kira',
             icon: 'ic:round-account-balance',
-            path: '/ahli-kooperasi/index-review/kunci-kira-kira'
+            path: computed(() => `/ahli-kooperasi/index-review/kunci-kira-kira?organization_id=${isParentOrganization.value ? PARENT_ORGANIZATION_ID : selectedKoperasi.value || ''}`)
           },
           { 
             name: 'Akaun Pembahagian Keuntungan',
@@ -93,14 +196,6 @@ const documentSections = ref([
   }
 ]);
 
-const showIndex = ref(false);
-
-const handleSearch = () => {
-  if (selectedKoperasi.value && selectedAnakSyarikat.value) {
-    showIndex.value = true;
-  }
-};
-
 // Add search functionality
 const filteredItems = computed(() => {
   if (!searchQuery.value) return documentSections.value[0].items;
@@ -136,24 +231,39 @@ const filteredItems = computed(() => {
               />
             </div>
           </div>
+          
+          <!-- Organization type selection -->
+          <div class="p-4 border-b border-gray-200">
+            <div class="flex space-x-4">
+              <label v-for="option in organizationTypeOptions" :key="option.value" class="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  :value="option.value"
+                  v-model="isParentOrganization"
+                  class="form-radio text-blue-500 h-4 w-4"
+                />
+                <span class="text-sm text-gray-700">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Selection dropdowns and search button -->
           <div class="p-4">
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Koperasi</label>
-                <select v-model="selectedKoperasi" class="w-full p-2 border rounded">
-                  <option disabled value="">Sila pilih koperasi</option>
-                  <option v-for="option in koperasiOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </div>
-              <div>
+            <div :class="{ 'grid grid-cols-2 gap-4': !isParentOrganization, 'grid grid-cols-1 gap-4': isParentOrganization }">
+              <div v-if="!isParentOrganization">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Anak Syarikat</label>
-                <select v-model="selectedAnakSyarikat" class="w-full p-2 border rounded" :disabled="!selectedKoperasi">
+                <select 
+                  v-model="selectedKoperasi" 
+                  class="w-full p-2 border rounded" 
+                  :disabled="loading"
+                >
                   <option disabled value="">Sila pilih anak syarikat</option>
-                  <option v-for="option in anakSyarikatOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
+                  <option 
+                    v-for="sub in subsidiaries" 
+                    :key="sub.id" 
+                    :value="sub.id"
+                  >
+                    {{ sub.name }}
                   </option>
                 </select>
               </div>
@@ -161,99 +271,107 @@ const filteredItems = computed(() => {
                 <button
                   @click="handleSearch"
                   class="w-full h-[42px] bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
-                  :disabled="!selectedKoperasi || !selectedAnakSyarikat"
+                  :disabled="loading || (!isParentOrganization && !selectedKoperasi)"
                 >
-                  Cari
+                  <span v-if="!loading">Cari</span>
+                  <span v-else>Loading...</span>
                 </button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- Index sections -->
-          <div v-if="showIndex" class="px-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
-            <div class="bg-white rounded-lg shadow">
-              <div class="divide-y divide-gray-100">
-                <template v-for="(item, itemIndex) in filteredItems" :key="itemIndex">
-                  <!-- Parent items -->
-                  <div v-if="!item.subItems" 
-                       class="p-4 hover:bg-gray-50 transition-colors">
-                    <div class="flex items-center">
-                      <span class="w-8 text-gray-500 font-medium">{{ itemIndex + 1 }}.</span>
-                      <Icon :name="item.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
-                      <span class="text-gray-700 flex-grow">{{ item.name }}</span>
-                      <NuxtLink 
-                        :to="item.path"
-                        class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                        Buka
-                      </NuxtLink>
-                    </div>
-                  </div>
+      <!-- Error message -->
+      <div v-if="error" class="p-4">
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span class="block sm:inline">{{ error }}</span>
+        </div>
+      </div>
 
-                  <!-- Items with subitems -->
-                  <div v-else class="divide-y divide-gray-100">
-                    <div class="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                         @click="item.isExpanded = !item.isExpanded">
-                      <div class="flex items-center">
-                        <span class="w-8 text-gray-500 font-medium">{{ itemIndex + 1 }}.</span>
-                        <Icon :name="item.icon || 'ic:round-folder'" class="w-5 h-5 text-gray-500 mr-3" />
-                        <span class="text-gray-700 flex-grow">{{ item.name }}</span>
-                        <NuxtLink 
-                          :to="item.path"
-                          class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                          Buka
-                        </NuxtLink>
-                        <Icon :name="item.isExpanded ? 'ic:round-expand-less' : 'ic:round-expand-more'" 
-                              class="w-5 h-5 text-gray-400" />
-                      </div>
-                    </div>
-
-                    <!-- Subitems -->
-                    <div v-if="item.isExpanded" class="bg-gray-50">
-                      <div v-for="(subItem, subIndex) in item.subItems" 
-                           :key="subIndex"
-                           class="border-t border-gray-100">
-                        <div class="p-4 pl-12 hover:bg-gray-100 transition-colors"
-                             :class="{ 'cursor-pointer': subItem.subItems }"
-                             @click="subItem.subItems && (subItem.isExpanded = !subItem.isExpanded)">
-                          <div class="flex items-center">
-                            <Icon :name="subItem.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
-                            <span class="text-gray-700 flex-grow">{{ subItem.name }}</span>
-                            <template v-if="subItem.subItems">
-                              <Icon :name="subItem.isExpanded ? 'ic:round-expand-less' : 'ic:round-expand-more'"
-                                    class="w-5 h-5 text-gray-400" />
-                            </template>
-                            <template v-else>
-                              <NuxtLink 
-                                :to="subItem.path"
-                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                Buka
-                              </NuxtLink>
-                            </template>
-                          </div>
-                        </div>
-
-                        <!-- Nested subitems -->
-                        <div v-if="subItem.subItems && subItem.isExpanded" class="bg-gray-100">
-                          <div v-for="(nestedItem, nestedIndex) in subItem.subItems" 
-                               :key="nestedIndex"
-                               class="p-4 pl-24 hover:bg-gray-200 transition-colors border-t border-gray-200">
-                            <div class="flex items-center">
-                              <Icon :name="nestedItem.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
-                              <span class="text-gray-700 flex-grow">{{ nestedItem.name }}</span>
-                              <NuxtLink 
-                                :to="nestedItem.path"
-                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                Buka
-                              </NuxtLink>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
+      <!-- Index sections -->
+      <div v-if="showIndex" class="px-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
+        <div class="bg-white rounded-lg shadow">
+          <div class="divide-y divide-gray-100">
+            <template v-for="(item, itemIndex) in filteredItems" :key="itemIndex">
+              <!-- Parent items -->
+              <div v-if="!item.subItems" 
+                   class="p-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-center">
+                  <span class="w-8 text-gray-500 font-medium">{{ itemIndex + 1 }}.</span>
+                  <Icon :name="item.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
+                  <span class="text-gray-700 flex-grow">{{ item.name }}</span>
+                  <NuxtLink 
+                    :to="item.path"
+                    class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    Buka
+                  </NuxtLink>
+                </div>
               </div>
-            </div>
+
+              <!-- Items with subitems -->
+              <div v-else class="divide-y divide-gray-100">
+                <div class="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                     @click="item.isExpanded = !item.isExpanded">
+                  <div class="flex items-center">
+                    <span class="w-8 text-gray-500 font-medium">{{ itemIndex + 1 }}.</span>
+                    <Icon :name="item.icon || 'ic:round-folder'" class="w-5 h-5 text-gray-500 mr-3" />
+                    <span class="text-gray-700 flex-grow">{{ item.name }}</span>
+                    <NuxtLink 
+                      :to="item.path"
+                      class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                      Buka
+                    </NuxtLink>
+                    <Icon :name="item.isExpanded ? 'ic:round-expand-less' : 'ic:round-expand-more'" 
+                          class="w-5 h-5 text-gray-400 ml-2" />
+                  </div>
+                </div>
+
+                <!-- Subitems -->
+                <div v-if="item.isExpanded" class="bg-gray-50">
+                  <div v-for="(subItem, subIndex) in item.subItems" 
+                       :key="subIndex"
+                       class="border-t border-gray-100">
+                    <div class="p-4 pl-12 hover:bg-gray-100 transition-colors"
+                         :class="{ 'cursor-pointer': subItem.subItems }"
+                         @click="subItem.subItems && (subItem.isExpanded = !subItem.isExpanded)">
+                      <div class="flex items-center">
+                        <Icon :name="subItem.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
+                        <span class="text-gray-700 flex-grow">{{ subItem.name }}</span>
+                        <template v-if="subItem.subItems">
+                          <Icon :name="subItem.isExpanded ? 'ic:round-expand-less' : 'ic:round-expand-more'"
+                                class="w-5 h-5 text-gray-400" />
+                        </template>
+                        <template v-else>
+                          <NuxtLink 
+                            :to="subItem.path"
+                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Buka
+                          </NuxtLink>
+                        </template>
+                      </div>
+                    </div>
+
+                    <!-- Nested subitems -->
+                    <div v-if="subItem.subItems && subItem.isExpanded" class="bg-gray-100">
+                      <div v-for="(nestedItem, nestedIndex) in subItem.subItems" 
+                           :key="nestedIndex"
+                           class="p-4 pl-24 hover:bg-gray-200 transition-colors border-t border-gray-200">
+                        <div class="flex items-center">
+                          <Icon :name="nestedItem.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
+                          <span class="text-gray-700 flex-grow">{{ nestedItem.name }}</span>
+                          <NuxtLink 
+                            :to="nestedItem.path"
+                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Buka
+                          </NuxtLink>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </div>

@@ -1,13 +1,40 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'nuxt/app';
 
 definePageMeta({
   layout: "admin",
 });
 
-// Dynamic year selection
+// Organization data
+const route = useRoute();
+const organizationId = route.query.organization_id;
+const organizationName = ref('');
 const currentYear = ref(new Date().getFullYear());
 const previousYear = ref(currentYear.value - 1);
+
+// Fetch organization data
+const fetchOrganization = async () => {
+  try {
+    const { data: response } = await useFetch(`/api/organization/${organizationId}`);
+    if (response.value?.status === 'success') {
+      organizationName.value = response.value.data.name;
+      if (response.value.data.current_year) {
+        currentYear.value = response.value.data.current_year;
+        previousYear.value = currentYear.value - 1;
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching organization:', error);
+  }
+};
+
+// Fetch organization data when component mounts
+onMounted(() => {
+  if (organizationId) {
+    fetchOrganization();
+  }
+});
 
 // Function to format currency
 const formatCurrency = (value) => {
@@ -29,8 +56,8 @@ const calculateSubtotal = (items, year) => {
 
 // Ledger data for Aset
 const asetData = ref({
-  title: 'KOPERASI ABC BERHAD',
-  date: `PADA 31 DISEMBER ${currentYear.value}`,
+  title: computed(() => organizationName.value || 'Loading...'),
+  date: computed(() => `PADA 31 DISEMBER ${currentYear.value}`),
   rows: [
     {
       name: 'ASET BUKAN SEMASA',
@@ -228,8 +255,8 @@ const validateInput = (event, item, field) => {
   <div class="min-h-screen bg-white p-6">
     <!-- Title Section -->
     <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold text-gray-800">KOPERASI ABC BERHAD</h1>
-      <h3 class="text-lg text-gray-600 mt-1">PADA 31 DISEMBER {{ currentYear }}</h3>
+      <h1 class="text-2xl font-bold text-gray-800">{{organizationName}}</h1>
+      <h3 class="text-lg text-gray-600 mt-1">PADA {{ currentYear }}</h3>
     </div>
 
     <!-- Tab Navigation -->

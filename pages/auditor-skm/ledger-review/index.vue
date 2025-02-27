@@ -3,9 +3,269 @@ definePageMeta({
   layout: "admin",
 });
 
-// Add reactive data for the ledger
+// Move all reactive declarations to the top
+const searchQuery = ref('');
+const isParentOrganization = ref(true);
+const selectedKoperasi = ref(null);
+const selectedAnakSyarikat = ref(null);
+const subsidiaries = ref([]);
+const loading = ref(false);
+const error = ref(null);
+const showAnakSyarikat = ref(false);
+const showLedger = ref(false);
+const selectedGroup = ref(null);
+const generationStatus = ref(null);
+const statementGroups = ref([]);
+
+// Panel visibility state
+const isRiskPanelOpen = ref(false);
+const isMaterialityPanelOpen = ref(false);
+const isAuditSamplingPanelOpen = ref(false);
+
+// Add reactive variables for job tracking
+const generationJobId = ref(null);
+const statusCheckInterval = ref(null);
+
+// Fetch organizations from API
+const { data: organizationResponse } = await useFetch('/api/organization/list', {
+  method: 'GET'
+});
+
+// Function to fetch statement groups
+const fetchStatementGroups = async (organizationId) => {
+  if (!organizationId) return;
+  
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const { data: response } = await useFetch(`/api/financial-statement/group/list`, {
+      method: 'GET',
+      params: {
+        organization_id: organizationId
+      }
+    });
+
+    if (response.value?.status === 'success') {
+      statementGroups.value = response.value.data.groups;
+    } else {
+      throw new Error(response.value?.message || 'Failed to fetch statement groups');
+    }
+  } catch (err) {
+    error.value = err.message;
+    statementGroups.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Transform organizations into dropdown options
+const koperasiOptions = computed(() => {
+  if (!organizationResponse.value?.status === 'success') return [];
+  
+  return organizationResponse.value.data.organizations.map(org => ({
+    value: org.id,
+    label: org.name,
+    data: org // Store full organization data for later use
+  }));
+});
+
+// Get selected koperasi data
+const selectedKoperasiData = computed(() => {
+  if (!selectedKoperasi.value) return null;
+  return koperasiOptions.value.find(opt => opt.value === selectedKoperasi.value)?.data;
+});
+
+// Transform subsidiaries into dropdown options based on selected koperasi
+const anakSyarikatOptions = computed(() => {
+  if (!selectedKoperasiData.value) return [];
+  
+  return selectedKoperasiData.value.children.map(child => ({
+    value: child.id,
+    label: child.name,
+    data: child
+  }));
+});
+
+// Get available ledger types based on selected organization and group
+const availableLedgers = computed(() => {
+  if (!selectedKoperasiData.value || !selectedGroup.value) return [];
+  
+  const organization = selectedAnakSyarikat.value 
+    ? anakSyarikatOptions.value.find(opt => opt.value === selectedAnakSyarikat.value)?.data
+    : selectedKoperasiData.value;
+
+  if (!organization) return [];
+
+  // Get ledgers from selected group
+  const group = statementGroups.value.find(g => g.id === selectedGroup.value);
+  if (!group) return [];
+
+  return group.items
+    .filter(item => item.type === 'ledger')
+    .map(item => ({
+      value: item.statement?.id || '',
+      label: item.statement?.fileName || 'Unnamed Ledger',
+      data: item.statement
+    }))
+    .filter(item => item.value); // Only include items with valid IDs
+});
+
+// Reset selections when dependencies change
+watch(selectedKoperasi, async (newValue) => {
+  selectedAnakSyarikat.value = null;
+  selectedGroup.value = null;
+  showAnakSyarikat.value = newValue !== null;
+  showLedger.value = false;
+  
+  if (newValue) {
+    await fetchStatementGroups(newValue);
+  } else {
+    statementGroups.value = [];
+  }
+});
+
+watch(selectedAnakSyarikat, async (newValue) => {
+  selectedGroup.value = null;
+  showLedger.value = false;
+  
+  if (newValue) {
+    await fetchStatementGroups(newValue);
+  } else if (selectedKoperasi.value) {
+    await fetchStatementGroups(selectedKoperasi.value);
+  }
+});
+
+watch(selectedGroup, () => {
+  showLedger.value = false;
+});
+
+// Function to store job ID in localStorage
+const storeJobId = (groupId, jobId) => {
+  localStorage.setItem('ledgerGenerationJob', JSON.stringify({
+    groupId,
+    jobId,
+    timestamp: Date.now()
+  }));
+};
+
+// Function to clear stored job
+const clearStoredJob = () => {
+  localStorage.removeItem('ledgerGenerationJob');
+};
+
+// Function to check generation status
+const checkGenerationStatus = async () => {
+  if (!generationJobId.value) return;
+
+  try {
+    const response = await $fetch('/api/financial-statement/check-ledger-status', {
+      method: 'POST',
+      body: {
+        job_id: generationJobId.value
+      }
+    });
+
+    if (response.status === 'success') {
+      // Clear interval and storage
+      if (statusCheckInterval.value) {
+        clearInterval(statusCheckInterval.value);
+        statusCheckInterval.value = null;
+      }
+      clearStoredJob();
+
+      // Update ledger data with the response
+      ledgerData.value = response.data.result.ledger;
+      riskAssessment.value = response.data.result.riskAssessment;
+      materialityData.value = response.data.result.materiality;
+      auditSamplingData.value = response.data.result.auditSampling;
+      showLedger.value = true;
+      generationStatus.value = 'success';
+    } else if (response.status === 'error') {
+      // Clear interval and storage on error
+      if (statusCheckInterval.value) {
+        clearInterval(statusCheckInterval.value);
+        statusCheckInterval.value = null;
+      }
+      clearStoredJob();
+      error.value = response.data.error || 'Failed to check generation status';
+      generationStatus.value = 'error';
+    }
+  } catch (err) {
+    console.error('Error checking generation status:', err);
+    error.value = 'Error while checking generation status';
+    generationStatus.value = 'error';
+  }
+};
+
+// Function to generate ledger
+const generateLedger = async () => {
+  if (!selectedKoperasi.value || !selectedGroup.value) return;
+
+  loading.value = true;
+  error.value = null;
+  generationStatus.value = null;
+  showLedger.value = false;
+
+  try {
+    const response = await $fetch('/api/financial-statement/generate-ledger', {
+      method: 'POST',
+      body: {
+        group_id: selectedGroup.value
+      }
+    });
+
+    if (response.status === 'success') {
+      generationJobId.value = response.data.job_id;
+      // Store the job ID
+      storeJobId(selectedGroup.value, response.data.job_id);
+      
+      // Start checking status
+      statusCheckInterval.value = setInterval(checkGenerationStatus, 5000);
+    } else {
+      throw new Error(response.message || 'Failed to generate ledger');
+    }
+  } catch (err) {
+    error.value = err.message;
+    generationStatus.value = 'error';
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Check for existing job on component mount
+onMounted(() => {
+  const storedJob = localStorage.getItem('ledgerGenerationJob');
+  if (storedJob) {
+    try {
+      const { groupId, jobId, timestamp } = JSON.parse(storedJob);
+      
+      // Check if the job is not too old (e.g., 1 hour)
+      if (Date.now() - timestamp < 3600000) {
+        generationJobId.value = jobId;
+        selectedGroup.value = groupId;
+        statusCheckInterval.value = setInterval(checkGenerationStatus, 5000);
+      } else {
+        clearStoredJob();
+      }
+    } catch (err) {
+      console.error('Error parsing stored job:', err);
+      clearStoredJob();
+    }
+  }
+});
+
+// Clean up interval on component unmount
+onUnmounted(() => {
+  if (statusCheckInterval.value) {
+    clearInterval(statusCheckInterval.value);
+    statusCheckInterval.value = null;
+  }
+});
+
+// Add ledger data
 const ledgerData = ref({
-  title: 'KOPERASI XXXXXXXX BERHAD',
+  title: computed(() => selectedKoperasiData.value?.name || 'KOPERASI XXXXXXXX BERHAD'),
   subtitle: 'PENYATA KEWANGAN : 31 DISEMBER 20XX',
   columns: [
     { name: 'AKAUN 20XX', subColumns: ['DEBIT RM', 'KREDIT RM'] },
@@ -113,7 +373,16 @@ ledgerData.value.rows.forEach(row => {
   });
 });
 
-// Handle value changes
+// Handlers and Functions
+const handleCooperativeSelect = (event) => {
+  selectedKoperasi.value = event.target.value;
+  showAnakSyarikat.value = selectedKoperasi.value !== '';
+};
+
+const handleLedgerSelect = (event) => {
+  selectedGroup.value = event.target.value;
+};
+
 const updateValue = (row, column, subColumn, value) => {
   if (column.subColumns) {
     const field = subColumn.toLowerCase();
@@ -121,13 +390,11 @@ const updateValue = (row, column, subColumn, value) => {
   }
 };
 
-// Add handler for background toggle
 const toggleBackground = (row, column, subColumn) => {
   const field = subColumn.toLowerCase() + 'Bg';
   row.values[column.name][field] = !row.values[column.name][field];
 };
 
-// Add new row function
 const addNewRow = () => {
   const newRow = {
     code: '',
@@ -152,7 +419,23 @@ const addNewRow = () => {
   ledgerData.value.rows.push(newRow);
 };
 
-// Add reactive data for risk assessment
+const toggleRiskPanel = () => {
+  isRiskPanelOpen.value = !isRiskPanelOpen.value;
+};
+
+const toggleMaterialityPanel = () => {
+  isMaterialityPanelOpen.value = !isMaterialityPanelOpen.value;
+};
+
+const toggleAuditSamplingPanel = () => {
+  isAuditSamplingPanelOpen.value = !isAuditSamplingPanelOpen.value;
+};
+
+const toggleCategory = (category) => {
+  category.isOpen = !category.isOpen;
+};
+
+// Risk Assessment Data
 const riskAssessment = ref({
   overallRisk: 'MEDIUM',
   categories: [
@@ -178,77 +461,11 @@ const riskAssessment = ref({
         'Regular staff training updates'
       ],
       isOpen: false
-    },
-    {
-      name: 'Compliance Risk',
-      level: 'MEDIUM',
-      status: 'MONITORING',
-      description: 'Recent regulatory changes require attention',
-      recommendations: [
-        'Update compliance documentation',
-        'Schedule regulatory review meeting'
-      ],
-      isOpen: false
     }
   ]
 });
 
-// Toggle category expansion
-const toggleCategory = (category) => {
-  category.isOpen = !category.isOpen;
-};
-
-// Add state for panel visibility
-const isRiskPanelOpen = ref(false);
-const isMaterialityPanelOpen = ref(false);
-const isAuditSamplingPanelOpen = ref(false);
-
-const toggleRiskPanel = () => {
-  isRiskPanelOpen.value = !isRiskPanelOpen.value;
-};
-
-const toggleMaterialityPanel = () => {
-  isMaterialityPanelOpen.value = !isMaterialityPanelOpen.value;
-};
-
-const toggleAuditSamplingPanel = () => {
-  isAuditSamplingPanelOpen.value = !isAuditSamplingPanelOpen.value;
-};
-
-// Add reactive data for cooperative and ledger selection
-const selectedCooperative = ref('');
-const selectedLedger = ref('');
-const showAnakSyarikat = ref(false);
-const showLedger = ref(false);
-
-const janaLejar = () => {
-  showLedger.value = true;
-};
-
-// Sample data for cooperatives and ledgers
-const koperasiList = ref([
-  { name: 'Koperasi A', anakSyarikat: ['Anak Syarikat A1', 'Anak Syarikat A2'] },
-  { name: 'Koperasi B', anakSyarikat: [] },
-  { name: 'Koperasi C', anakSyarikat: ['Anak Syarikat C1'] }
-]);
-
-const ledgers = ref([
-  { id: 1, name: 'PENYATA KEWANGAN : 31 DISEMBER 20XX' },
-  { id: 2, name: 'PENYATA KEWANGAN : 31 DISEMBER 20YY' }
-]);
-
-// Function to handle cooperative selection
-const selectCooperative = (event) => {
-  selectedCooperative.value = event.target.value;
-  showAnakSyarikat.value = selectedCooperative.value !== '';
-};
-
-// Function to handle ledger selection
-const selectLedger = (event) => {
-  selectedLedger.value = event.target.value;
-};
-
-// Add sample data for Materiality and Audit Sampling
+// Materiality Data
 const materialityData = ref({
   overallLevel: 'MEDIUM',
   categories: [
@@ -275,6 +492,7 @@ const materialityData = ref({
   ]
 });
 
+// Audit Sampling Data
 const auditSamplingData = ref({
   overallLevel: 'MEDIUM',
   categories: [
@@ -309,33 +527,99 @@ const auditSamplingData = ref({
       <div class="flex space-x-4">
         <div>
           <label for="cooperative" class="block text-sm font-medium text-gray-700">Koperasi</label>
-          <select id="cooperative" v-model="selectedCooperative" @change="selectCooperative" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <select 
+            id="cooperative" 
+            v-model="selectedKoperasi" 
+            @change="handleCooperativeSelect" 
+            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
             <option value="">Pilih Koperasi</option>
-            <option v-for="koperasi in koperasiList" :key="koperasi.name" :value="koperasi.name">{{ koperasi.name }}</option>
+            <option v-for="koperasi in koperasiOptions" :key="koperasi.value" :value="koperasi.value">
+              {{ koperasi.label }}
+            </option>
           </select>
         </div>
         <div v-if="showAnakSyarikat">
           <label for="anak-syarikat" class="block text-sm font-medium text-gray-700">Anak Syarikat</label>
-          <select id="anak-syarikat" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <select 
+            id="anak-syarikat" 
+            v-model="selectedAnakSyarikat"
+            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
             <option value="">Pilih Anak Syarikat</option>
-            <option v-for="anakSyarikat in koperasiList.find(k => k.name === selectedCooperative)?.anakSyarikat || []" :key="anakSyarikat" :value="anakSyarikat">{{ anakSyarikat }}</option>
+            <option v-for="anakSyarikat in anakSyarikatOptions" :key="anakSyarikat.value" :value="anakSyarikat.value">
+              {{ anakSyarikat.label }}
+            </option>
           </select>
         </div>
         <div>
-          <label for="ledger" class="block text-sm font-medium text-gray-700">Lejar</label>
-          <select id="ledger" v-model="selectedLedger" @change="selectLedger" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <label for="statement-group" class="block text-sm font-medium text-gray-700">Lejar</label>
+          <select 
+            id="statement-group" 
+            v-model="selectedGroup"
+            :disabled="!selectedKoperasi"
+            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
             <option value="">Pilih Lejar</option>
-            <option v-for="ledger in ledgers" :key="ledger.id" :value="ledger.name">{{ ledger.name }}</option>
+            <option v-for="group in statementGroups" :key="group.id" :value="group.id">
+              {{ group.name }}
+            </option>
           </select>
         </div>
         <div>
-          <button @click="janaLejar" class="mt-6 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Jana Lejar</button>
+          <button 
+            @click="generateLedger" 
+            :disabled="!selectedKoperasi || !selectedGroup || loading"
+            class="mt-6 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            <span v-if="loading" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+            <span>{{ loading ? 'Menjana...' : 'Jana Lejar' }}</span>
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- Error Alert -->
+    <div v-if="error" class="mt-4">
+      <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Ralat</h3>
+            <div class="mt-2 text-sm text-red-700">
+              <p>{{ error }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Alert -->
+    <div v-if="generationStatus === 'success'" class="mt-4">
+      <div class="bg-green-50 border border-green-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-green-800">Berjaya</h3>
+            <div class="mt-2 text-sm text-green-700">
+              <p>Lejar berjaya dijana</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showLedger">
       <!-- Display ledger and review only if both cooperative and ledger are selected -->
-      <div v-if="selectedCooperative && selectedLedger">
+      <div v-if="selectedKoperasi && selectedGroup">
         <!-- Add toggle buttons in the main content -->
         <div class="fixed top-20 right-4 z-10 flex space-x-2">
           <button @click="toggleRiskPanel" class="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-50 transition-colors duration-200">

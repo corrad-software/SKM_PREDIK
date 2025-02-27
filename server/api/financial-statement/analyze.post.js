@@ -13,20 +13,22 @@ export default defineLazyEventHandler(async () => {
 
   // Define the analysis schema
   const analysisSchema = z.object({
-    document_overview: z.array(z.object({
-      issue_type: z.string(),
-      issue_category: z.string(),
-      issue_description: z.string(),
-      expected_result: z.string(),
-      correction_suggestion: z.string()
-    })),
+    document_overview: z.array(
+      z.object({
+        issue_type: z.string(),
+        issue_category: z.string(),
+        issue_description: z.string(),
+        expected_result: z.string(),
+        correction_suggestion: z.string(),
+      })
+    ),
     summary: z.object({
       major_issues: z.number(),
       minor_issues: z.number(),
       document_revisions: z.number(),
       sections_needing_review: z.number(),
-      sections_to_review: z.array(z.string())
-    })
+      sections_to_review: z.array(z.string()),
+    }),
   });
 
   return defineEventHandler(async (event) => {
@@ -149,7 +151,9 @@ Pastikan:
 
       try {
         const { object: analysis } = await generateObject({
-          model: openai("gpt-4"),
+          model: openai('gpt-4o-2024-08-06', {
+            structuredOutputs: true
+          }),
           schema: analysisSchema,
           schemaDescription:
             "Analisis penyata kewangan yang mengandungi jumlah isu, senarai isu terperinci, dan keperluan semakan",
