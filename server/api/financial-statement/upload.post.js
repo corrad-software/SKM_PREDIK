@@ -5,7 +5,6 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
-import FormData from 'form-data';
 
 const ENV = useRuntimeConfig();
 
@@ -51,6 +50,43 @@ const cleanupTempFiles = async (files) => {
   }
 };
 
+// Helper function to parse numeric values
+function parseNumericValue(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    // Remove currency symbols, commas and convert to number
+    return parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+  }
+  return 0;
+}
+
+// Add helper function to extract year from date string
+function extractYear(dateString) {
+  if (!dateString) return null;
+  // Handle both full date strings and year strings
+  const year = new Date(dateString).getFullYear();
+  return isNaN(year) ? null : year;
+}
+
+// Add statement type validation
+const VALID_STATEMENT_TYPES = {
+  'kunci_kira_kira': 'kunci_kira_kira',
+  'imbangan_duga': 'imbangan_duga',
+  'ledger': 'ledger',
+  'bank_reconciliation': 'bank_reconciliation'
+};
+
+function validateStatementType(type) {
+  const validType = VALID_STATEMENT_TYPES[type];
+  if (!validType) {
+    throw createError({
+      statusCode: 400,
+      message: `Invalid statement type. Must be one of: ${Object.keys(VALID_STATEMENT_TYPES).join(', ')}`
+    });
+  }
+  return validType;
+}
+
 export default defineEventHandler(async (event) => {
   console.log('🚀 API Called: /api/financial-statement/upload');
   const tempFiles = []; // Track temp files for cleanup
@@ -58,19 +94,25 @@ export default defineEventHandler(async (event) => {
   try {
     // Read the request body
     const body = await readBody(event);
-    console.log('📦 Request body received:', {
-      type: body.type,
-      organization_id: body.organization_id,
-      hasStatementFile: !!body.statement_file,
-      hasReferenceFile: !!body.reference_file
-    });
+    
+    // Validate statement type first
+    const validatedType = validateStatementType(body.type);
+    
+    // Convert date strings to years before processing
+    const yearCurrent = extractYear(body.year_current);
+    const yearPrevious = extractYear(body.year_previous);
+
+    if (!yearCurrent || !yearPrevious) {
+      throw createError({
+        statusCode: 400,
+        message: "Invalid year format provided"
+      });
+    }
 
     // Validate required fields
     const requiredFields = [
       'type',
       'organization_id',
-      'year_current',
-      'year_previous',
       'state',
       'audited_by',
       'reviewed_by',
@@ -86,56 +128,40 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
-    console.log('✅ All required fields validated');
 
-    // Destructure the body
-    const {
-      type,
-      organization_id,
-      year_current,
-      year_previous,
-      state,
-      audited_by,
-      reviewed_by,
-      statement_file,
-      reference_file
-    } = body;
-
-    // Verify organization exists and user has access
-    console.log('🔍 Verifying organization access:', organization_id);
-    const { data: organization, error: orgError } = await supabase
-      .from('organizations')
-      .select('id, organization_type')
-      .eq('id', organization_id)
-      .eq('created_by', CONSTANTS.DEFAULT_USER_ID)
+    // Check if a statement of this type already exists for this organization
+    const { data: existingStatement, error: existingError } = await supabase
+      .from('financial_statements')
+      .select('id')
+      .eq('organization_id', body.organization_id)
+      .eq('statement_type', validatedType)
       .single();
 
-    if (orgError || !organization) {
-      console.log('❌ Organization verification failed:', orgError);
+    if (existingError && existingError.code !== 'PGRST116') { // PGRST116 is "not found" error
+      console.error('Error checking existing statement:', existingError);
       throw createError({
-        statusCode: 404,
-        message: "Organization not found or access denied",
+        statusCode: 500,
+        message: 'Error checking existing statement'
       });
     }
-    console.log('✅ Organization verified successfully');
 
     // Save files to temp directory
     console.log('💾 Saving statement file to temp directory');
-    const statementTempPath = await saveBase64ToTemp(statement_file, 'xlsx');
+    const statementTempPath = await saveBase64ToTemp(body.statement_file, 'xlsx');
     tempFiles.push(statementTempPath);
     console.log('✅ Statement file saved to:', statementTempPath);
 
     let referenceTempPath = null;
-    if (reference_file) {
+    if (body.reference_file) {
       console.log('💾 Saving reference file to temp directory');
-      referenceTempPath = await saveBase64ToTemp(reference_file, 'txt');
+      referenceTempPath = await saveBase64ToTemp(body.reference_file, 'txt');
       tempFiles.push(referenceTempPath);
       console.log('✅ Reference file saved to:', referenceTempPath);
     }
 
     // Generate unique filenames for storage
     const statementFileName = `${Date.now()}-statement.xlsx`;
-    const statementFilePath = `${type}/${statementFileName}`;
+    const statementFilePath = `${validatedType}/${statementFileName}`;
     console.log('📝 Generated statement file path:', statementFilePath);
     
     let referenceData = null;
@@ -144,7 +170,6 @@ export default defineEventHandler(async (event) => {
     console.log('⬆️ Uploading statement file to Supabase');
     const statementFileBuffer = await fs.promises.readFile(statementTempPath);
     
-    // Upload directly using the buffer
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('financial-statements')
@@ -161,7 +186,6 @@ export default defineEventHandler(async (event) => {
         message: `Failed to upload statement file: ${uploadError.message}`,
       });
     }
-    console.log('✅ Statement file uploaded successfully');
 
     // Get public URL for the uploaded statement file
     const { data: { publicUrl: statementPublicUrl } } = supabase
@@ -175,7 +199,6 @@ export default defineEventHandler(async (event) => {
       const referenceFilePath = `references/${referenceFileName}`;
       const referenceFileBuffer = await fs.promises.readFile(referenceTempPath);
 
-      // Upload reference file directly using buffer
       const { data: refUploadData, error: refUploadError } = await supabase
         .storage
         .from('financial-statements')
@@ -193,10 +216,11 @@ export default defineEventHandler(async (event) => {
         });
       }
 
-      // Create reference file record
+      // Create or update reference file record
       const { data: refData, error: refError } = await supabase
         .from('reference_files')
-        .insert({
+        .upsert({
+          id: existingStatement?.reference_file_id,
           file_name: referenceFileName,
           file_path: referenceFilePath,
           file_url: refUploadData.publicUrl
@@ -215,32 +239,61 @@ export default defineEventHandler(async (event) => {
       referenceData = refData;
     }
 
-    // Create the financial statement record
-    const { data: statementData, error: statementError } = await supabase
-      .from("financial_statements")
-      .insert({
-        file_name: statementFileName,
-        file_path: statementFilePath,
-        statement_type: type,
-        status: 'draft',
-        organization_id,
-        created_by: CONSTANTS.DEFAULT_USER_ID,
-        reference_file_id: referenceData?.id || null,
-        state,
-        year_current,
-        year_previous,
-        audited_by,
-        reviewed_by
-      })
-      .select()
-      .single();
+    // Create or update the financial statement record
+    const statementData = {
+      file_name: statementFileName,
+      file_path: statementFilePath,
+      statement_type: validatedType,
+      status: 'draft',
+      organization_id: body.organization_id,
+      created_by: CONSTANTS.DEFAULT_USER_ID,
+      reference_file_id: referenceData?.id || null,
+      state: body.state,
+      year_current: yearCurrent,
+      year_previous: yearPrevious,
+      audited_by: body.audited_by,
+      reviewed_by: body.reviewed_by
+    };
 
-    if (statementError) {
-      console.error('Supabase Error:', statementError);
-      throw createError({
-        statusCode: 500,
-        message: `Failed to create financial statement record: ${statementError.message}`,
-      });
+    if (existingStatement) {
+      // Update existing record
+      const { data: updatedStatement, error: updateError } = await supabase
+        .from('financial_statements')
+        .update(statementData)
+        .eq('id', existingStatement.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw createError({
+          statusCode: 500,
+          message: `Failed to update financial statement record: ${updateError.message}`,
+        });
+      }
+
+      // Delete old entries
+      await supabase
+        .from('financial_entries')
+        .delete()
+        .eq('statement_id', existingStatement.id);
+
+      statementData.id = existingStatement.id;
+    } else {
+      // Create new record
+      const { data: newStatement, error: insertError } = await supabase
+        .from('financial_statements')
+        .insert(statementData)
+        .select()
+        .single();
+
+      if (insertError) {
+        throw createError({
+          statusCode: 500,
+          message: `Failed to create financial statement record: ${insertError.message}`,
+        });
+      }
+
+      statementData.id = newStatement.id;
     }
 
     // Read the Excel file using exceljs
@@ -294,8 +347,8 @@ export default defineEventHandler(async (event) => {
           label: label,
           amount_current: null,
           amount_previous: null,
-          year_current,
-          year_previous,
+          year_current: yearCurrent,
+          year_previous: yearPrevious,
           is_total: false,
           parent_section: null,
           sort_order: sortOrder,
@@ -314,18 +367,17 @@ export default defineEventHandler(async (event) => {
         label: label,
         amount_current: currentValue,
         amount_previous: previousValue,
-        year_current,
-        year_previous,
+        year_current: yearCurrent,
+        year_previous: yearPrevious,
         is_total: isTotal,
         parent_section: currentSection,
         sort_order: sortOrder,
       });
     }
 
-    // Add log before database entries
-    console.log('💽 Inserting financial entries:', entries.length, 'rows');
+    // Insert new entries
     const { error: entriesError } = await supabase
-      .from("financial_entries")
+      .from('financial_entries')
       .insert(entries);
 
     if (entriesError) {
@@ -335,21 +387,19 @@ export default defineEventHandler(async (event) => {
         message: "Failed to insert financial entries",
       });
     }
-    console.log('✅ Financial entries inserted successfully');
 
     // Clean up temp files
     console.log('🧹 Cleaning up temporary files');
     await cleanupTempFiles(tempFiles);
-    console.log('✅ Temporary files cleaned up');
 
     console.log('🎉 Upload process completed successfully');
     return {
       status: "success",
       data: {
         statement_id: statementData.id,
-        organization_id,
-        year_current,
-        year_previous,
+        organization_id: body.organization_id,
+        year_current: yearCurrent,
+        year_previous: yearPrevious,
         statement_file: {
           name: statementFileName,
           path: statementFilePath,
@@ -366,23 +416,11 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     // Clean up temp files in case of error
     console.error('❌ Error occurred during upload process:', error);
-    console.log('🧹 Cleaning up temporary files after error');
     await cleanupTempFiles(tempFiles);
     
-    console.error('Error details:', error);
     return {
       status: "error",
       message: error.message || "An error occurred while processing the file",
     };
   }
 });
-
-// Helper function to parse numeric values
-function parseNumericValue(value) {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    // Remove currency symbols, commas and convert to number
-    return parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
-  }
-  return 0;
-}

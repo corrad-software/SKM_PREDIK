@@ -387,7 +387,7 @@ import { ref, computed, onMounted } from 'vue'
 
 const router = useRouter()
 
-const PARENT_ORGANIZATION_ID = '3df46589-5c74-45d2-a436-4291ddc6fdde'
+const PARENT_ORGANIZATION_ID = '62986bb9-b23c-4226-93c9-be523adabf77'
 
 const parentCompany = ref({
   id: PARENT_ORGANIZATION_ID,

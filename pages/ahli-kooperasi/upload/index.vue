@@ -4,6 +4,7 @@ definePageMeta({
 });
 
 import { ref, onMounted, computed, watch } from 'vue'
+import { useToast } from '~/composables/useToast';
 
 const route = useRoute()
 const sections = ref(['Butiran Koperasi', 'Kunci Kira Kira', 'Imbangan Duga', 'Ledger', 'Bank Reconciliation', 'Overall Review']);
@@ -42,23 +43,44 @@ const kooperasiDetails = ref({
 })
 
 // Watch for changes in form data and update cookie
-watch([kooperasiDetails, isParentOrganization], ([newDetails, newIsParent]) => {
+watch([kooperasiDetails, isParentOrganization], async ([newDetails, newIsParent]) => {
   formDataCookie.value = {
     ...newDetails,
     isParentOrganization: newIsParent
   }
+
+  // Update URL with organization_id
+  const router = useRouter()
+  const currentQuery = { ...route.query }
+  
+  if (newIsParent) {
+    currentQuery.organization_id = PARENT_ORGANIZATION_ID
+    delete currentQuery.subsidiary_id
+  } else if (newDetails.subsidiariKoperasi) {
+    currentQuery.subsidiary_id = newDetails.subsidiariKoperasi
+    delete currentQuery.organization_id
+  } else {
+    delete currentQuery.organization_id
+    delete currentQuery.subsidiary_id
+  }
+  
+  await router.replace({ query: currentQuery })
 }, { deep: true })
 
-// Function to set initial section based on URL parameter
+// Function to set initial section and organization based on URL parameters
 const initializeSection = () => {
   const sectionParam = parseInt(route.query.section)
   if (!isNaN(sectionParam) && sectionParam >= 0 && sectionParam < sections.value.length) {
     currentSection.value = sectionParam
   }
   
-  // Set organization type based on route query
-  if (isSubsidiary.value) {
+  // Set organization type and ID based on URL parameters
+  if (route.query.subsidiary_id) {
     isParentOrganization.value = false
+    kooperasiDetails.value.subsidiariKoperasi = route.query.subsidiary_id
+  } else if (route.query.organization_id === PARENT_ORGANIZATION_ID) {
+    isParentOrganization.value = true
+    kooperasiDetails.value.subsidiariKoperasi = ''
   }
 }
 
@@ -84,13 +106,46 @@ const pageTitle = computed(() => {
 })
 
 // Initialize section on component mount
-onMounted(() => {
-  initializeSection()
-})
+onMounted(async () => {
+  try {
+    // Initialize section
+    initializeSection();
+    
+    // Fetch subsidiaries
+    await fetchSubsidiaries();
+    
+    // If organization ID is already in URL or cookie, fetch its statements
+    const organizationId = route.query.organization_id || 
+                         route.query.subsidiary_id || 
+                         (kooperasiDetails.value.subsidiariKoperasi);
+                         
+    if (organizationId) {
+      await fetchOrganizationStatements(organizationId);
+    }
+  } catch (error) {
+    console.error('Error during initialization:', error);
+    errorMessage.value = 'Failed to initialize data. Please refresh the page.';
+  }
+});
 
-const nextSection = () => {
+const nextSection = async () => {
   if (currentSection.value < sections.value.length - 1) {
-    currentSection.value++;
+    if (currentSection.value === 0) {
+      const organizationId = !isParentOrganization.value 
+        ? kooperasiDetails.value.subsidiariKoperasi 
+        : PARENT_ORGANIZATION_ID;
+        
+      if (organizationId) {
+        try {
+          await fetchOrganizationStatements(organizationId);
+          currentSection.value++;
+        } catch (error) {
+          errorMessage.value = 'Failed to load document information. Please try again.';
+        }
+      }
+    } else {
+      currentSection.value++;
+    }
   }
 };
 
@@ -102,9 +157,78 @@ const prevSection = () => {
 
 const isOpen = ref(false);
 
-const submitForm = () => {
-  isOpen.value = true;
-  clearFormData(); // Clear form data after successful submission
+// Add new function to prepare statements data
+const prepareStatementsData = () => {
+  const statements = [];
+  
+  if (uploadedStatements.value?.kunciKiraKira?.id) {
+    statements.push({
+      statement_id: uploadedStatements.value.kunciKiraKira.id,
+      type: 'kunci_kira_kira'
+    });
+  }
+  
+  if (uploadedStatements.value?.imbanganDuga?.id) {
+    statements.push({
+      statement_id: uploadedStatements.value.imbanganDuga.id,
+      type: 'imbangan_duga'
+    });
+  }
+  
+  if (uploadedStatements.value?.ledger?.id) {
+    statements.push({
+      statement_id: uploadedStatements.value.ledger.id,
+      type: 'ledger'
+    });
+  }
+  
+  if (uploadedStatements.value?.bankReconciliation?.id) {
+    statements.push({
+      statement_id: uploadedStatements.value.bankReconciliation.id,
+      type: 'bank_reconciliation'
+    });
+  }
+  
+  return statements;
+};
+
+// Update submitForm function
+const submitForm = async () => {
+  try {
+    const organizationId = isParentOrganization.value ? 
+      PARENT_ORGANIZATION_ID : 
+      kooperasiDetails.value.subsidiariKoperasi;
+
+    const statements = prepareStatementsData();
+    
+    if (statements.length === 0) {
+      showErrorToast('Tiada dokumen yang dimuat naik');
+      return;
+    }
+
+    const payload = {
+      name: `Dokumen Audit ${new Date().getFullYear()}`,
+      description: `Dokumen audit untuk ${isParentOrganization.value ? 'Koperasi Induk' : 'Anak Syarikat'} - ${new Date().toLocaleDateString()}`,
+      statements,
+      organization_id: organizationId
+    };
+
+    const response = await $fetch('/api/financial-statement/group/create', {
+      method: 'POST',
+      body: payload
+    });
+
+    if (response.status === 'success') {
+      isOpen.value = true;
+      showSuccessToast('Dokumen berjaya dihantar');
+      clearFormData(); // Clear form data after successful submission
+    } else {
+      throw new Error(response.message || 'Gagal menghantar dokumen');
+    }
+  } catch (error) {
+    console.error('Error submitting form:', error);
+    showErrorToast(error.message || 'Gagal menghantar dokumen');
+  }
 };
 
 const accountingDocuments = ref({
@@ -134,6 +258,14 @@ const fileAttachments = ref({
   bankReconciliation: { statement: null, reference: null }
 });
 
+// Add mapping for statement types
+const STATEMENT_TYPES = {
+  kunciKiraKira: 'kunci_kira_kira',
+  imbanganDuga: 'imbangan_duga',
+  ledger: 'ledger',
+  bankReconciliation: 'bank_reconciliation'
+};
+
 // Update handleFileChange to handle both statement and reference files
 const handleFileChange = (event, type, fileType) => {
   const files = event.target.files;
@@ -150,15 +282,69 @@ const handleFileChange = (event, type, fileType) => {
   }
 };
 
-// Update uploadDocument function to handle both files
+// Remove showSuccessMessage and successMessage refs
+const errorMessage = ref('');
+
+// Update showSuccessToast function to use toast properly
+const showSuccessToast = (message) => {
+  const toast = useToast();
+  toast.add({
+    title: 'Berjaya',
+    description: message,
+    type: 'success',
+    position: 'top-right',
+    duration: 3000
+  });
+};
+
+// Update showErrorToast function to use toast properly
+const showErrorToast = (message) => {
+  const toast = useToast();
+  toast.add({
+    title: 'Ralat',
+    description: message,
+    type: 'error',
+    position: 'top-right',
+    duration: 5000
+  });
+};
+
+// Replace localStorage with cookie storage
+const uploadedStatements = useCookie('uploadedStatements', {
+  maxAge: 3600 * 24 * 7, // Cookie expires in 7 days
+  watch: true,
+  default: () => ({
+    kunciKiraKira: null,
+    imbanganDuga: null,
+    ledger: null,
+    bankReconciliation: null
+  })
+});
+
+// Add uploaded files tracking
+const uploadedFiles = ref({
+  kunciKiraKira: null,
+  imbanganDuga: null,
+  ledger: null,
+  bankReconciliation: null
+});
+
+// Initialize data on mount
+onMounted(() => {
+  if (!uploadedStatements.value) {
+    uploadedStatements.value = {};
+  }
+});
+
+// Update uploadDocument function to save file info
 const uploadDocument = async (type) => {
   if (!kooperasiDetails.value.subsidiariKoperasi && !isParentOrganization.value) {
-    alert('Sila pilih anak syarikat terlebih dahulu');
+    errorMessage.value = 'Sila pilih anak syarikat terlebih dahulu';
     return;
   }
 
   if (!fileAttachments.value[type].statement) {
-    alert('Sila pilih fail untuk dimuat naik');
+    errorMessage.value = 'Sila pilih fail untuk dimuat naik';
     return;
   }
 
@@ -167,7 +353,7 @@ const uploadDocument = async (type) => {
 
   try {
     const formData = {
-      type,
+      type: STATEMENT_TYPES[type],
       organization_id: kooperasiDetails.value.subsidiariKoperasi,
       year_current: kooperasiDetails.value.tahunKewanganSemasa,
       year_previous: kooperasiDetails.value.tahunKewanganSebelum,
@@ -178,14 +364,41 @@ const uploadDocument = async (type) => {
       reference_file: fileAttachments.value[type].reference
     };
 
+    // Upload the file
     const response = await $fetch('/api/financial-statement/upload', {
       method: 'POST',
       body: formData
     });
 
     if (response.status === 'success') {
-      alert('Dokumen berjaya dimuat naik');
-      nextSection();
+      // Fetch latest data after successful upload
+      await fetchOrganizationStatements(kooperasiDetails.value.subsidiariKoperasi);
+      showSuccessToast('Dokumen berjaya dimuat naik');
+
+      // Start analysis process
+      analyzingStatus.value[type] = true;
+      try {
+        const analysisResponse = await $fetch('/api/financial-statement/analyze', {
+          method: 'POST',
+          body: {
+            statement_id: response.data.statement_id
+          }
+        });
+
+        if (analysisResponse.status === 'success') {
+          // Fetch latest data again after analysis
+          await fetchOrganizationStatements(kooperasiDetails.value.subsidiariKoperasi);
+          showSuccessToast('Analisis dokumen selesai');
+        } else {
+          throw new Error('Failed to analyze document');
+        }
+      } catch (analysisError) {
+        console.error(`Error analyzing ${type}:`, analysisError);
+        errorMessage.value = 'Gagal menganalisis dokumen';
+      } finally {
+        analyzingStatus.value[type] = false;
+      }
+      
       // Clear attachments after successful upload
       fileAttachments.value[type] = { statement: null, reference: null };
     } else {
@@ -193,14 +406,13 @@ const uploadDocument = async (type) => {
     }
   } catch (error) {
     console.error(`Error uploading ${type}:`, error);
-    uploadStatus.value[type].error = error.message || 'Gagal memuat naik dokumen';
-    alert(uploadStatus.value[type].error);
+    errorMessage.value = error.message || 'Gagal memuat naik dokumen';
   } finally {
     uploadStatus.value[type].loading = false;
   }
 };
 
-// Update upload handlers to not pass formRef
+// Update upload handlers to use the correct type keys
 const uploadKunciKiraKira = () => uploadDocument('kunciKiraKira');
 const uploadImbanganDuga = () => uploadDocument('imbanganDuga');
 const uploadLedger = () => uploadDocument('ledger');
@@ -211,34 +423,33 @@ const processDocuments = () => {
   console.log('Processing documents:', accountingDocuments.value);
 };
 
+// Update isReviewVisible to check for uploaded status instead of accountingDocuments
+const isReviewVisible = computed(() => {
+  return uploadedStatements.value?.kunciKiraKira?.id != null;
+});
+
+// Add analyzing state tracking
+const analyzingStatus = ref({
+  kunciKiraKira: false,
+  imbanganDuga: false,
+  ledger: false,
+  bankReconciliation: false
+});
+
+// Update documentReview to be reactive
 const documentReview = ref({
   kunciKiraKira: {
     sections: [
       {
         section: 'Bahagian 1: Gambaran Keseluruhan Dokumen',
-        issues: [
-          {
-            issueDescription: 'Nilai hilang di baris 5',
-            expected: 'Data kewangan lengkap di semua baris',
-            suggestedCorrection: 'Isi nilai yang hilang di baris 5',
-            faultCategory: 'Data Tidak Lengkap',
-            impactLevel: 'Kecil'
-          },
-          {
-            issueDescription: 'Data tidak konsisten di lajur B',
-            expected: 'Format data yang konsisten di seluruh lajur',
-            suggestedCorrection: 'Standardkan format data di lajur B',
-            faultCategory: 'Ketidakkonsistenan Data',
-            impactLevel: 'Kecil'
-          }
-        ]
+        issues: []
       }
     ],
     summary: {
       totalMajorIssues: 0,
-      totalMinorIssues: 2,
+      totalMinorIssues: 0,
       totalRalatDokumen: 0,
-      sectionsRequiringRevisions: ['Gambaran Keseluruhan Dokumen']
+      sectionsRequiringRevisions: []
     }
   },
   imbanganDuga: { sections: [], summary: { totalMajorIssues: 0, totalMinorIssues: 0, totalRalatDokumen: 0, sectionsRequiringRevisions: [] } },
@@ -246,9 +457,31 @@ const documentReview = ref({
   bankReconciliation: { sections: [], summary: { totalMajorIssues: 0, totalMinorIssues: 0, totalRalatDokumen: 0, sectionsRequiringRevisions: [] } }
 });
 
-const isReviewVisible = computed(() => {
-  return accountingDocuments.value.kunciKiraKira && accountingDocuments.value.kunciKiraKiraFailRujukan;
-});
+// Add function to map analysis result to review format
+const mapAnalysisToReview = (analysis, type) => {
+  const issues = analysis.document_overview.map(issue => ({
+    issueDescription: issue.issue_description,
+    expected: issue.expected_result,
+    suggestedCorrection: issue.correction_suggestion,
+    faultCategory: issue.issue_category,
+    impactLevel: issue.issue_type === 'Isu Utama' ? 'Major' : 'Minor'
+  }));
+
+  documentReview.value[type] = {
+    sections: [
+      {
+        section: 'Bahagian 1: Gambaran Keseluruhan Dokumen',
+        issues: issues
+      }
+    ],
+    summary: {
+      totalMajorIssues: analysis.summary.major_issues,
+      totalMinorIssues: analysis.summary.minor_issues,
+      totalRalatDokumen: analysis.summary.document_revisions,
+      sectionsRequiringRevisions: analysis.summary.sections_to_review
+    }
+  };
+};
 
 // Add new data for dropdowns
 const kooperasiList = ref([
@@ -258,7 +491,7 @@ const kooperasiList = ref([
   { id: 4, name: 'Bank Kerjasama Rakyat Malaysia Berhad', hasSubsidiaries: true },
 ]);
 
-const PARENT_ORGANIZATION_ID = '3df46589-5c74-45d2-a436-4291ddc6fdde'
+const PARENT_ORGANIZATION_ID = '62986bb9-b23c-4226-93c9-be523adabf77'
 
 // Remove the static subsidiariList since we'll fetch from API
 const subsidiaries = ref([])
@@ -275,18 +508,65 @@ const fetchSubsidiaries = async () => {
   }
 }
 
+// Fetch organization statements
+const fetchOrganizationStatements = async (organizationId) => {
+  isLoading.value = true;
+  apiError.value = null;
+  
+  try {
+    const response = await $fetch(`/api/financial-statement/organization/${organizationId}`);
+    if (response?.status === 'success') {
+      const statements = response.data;
+      
+      uploadedStatements.value = {
+        kunciKiraKira: statements.kunci_kira_kira,
+        imbanganDuga: statements.imbangan_duga,
+        ledger: statements.ledger,
+        bankReconciliation: statements.bank_reconciliation
+      };
+
+      Object.entries(statements).forEach(([type, data]) => {
+        if (data?.analysis) {
+          const frontendType = {
+            kunci_kira_kira: 'kunciKiraKira',
+            imbangan_duga: 'imbanganDuga',
+            ledger: 'ledger',
+            bank_reconciliation: 'bankReconciliation'
+          }[type];
+
+          if (frontendType && data.analysis.document_overview) {
+            mapAnalysisToReview({
+              document_overview: data.analysis.document_overview,
+              summary: data.analysis.summary
+            }, frontendType);
+          }
+        }
+      });
+    } else {
+      throw new Error(response?.message || 'Failed to fetch organization statements');
+    }
+  } catch (error) {
+    console.error('Error fetching organization statements:', error);
+    apiError.value = error.message || 'Failed to get document information';
+    showErrorToast(apiError.value);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Add watcher for subsidiariKoperasi changes
+watch(() => kooperasiDetails.value.subsidiariKoperasi, async (newValue) => {
+  if (newValue) {
+    await fetchOrganizationStatements(newValue);
+  }
+});
+
 // Update subsidiaries data structure to use API data
 const subsidiaryOptions = computed(() => {
   return subsidiaries.value.map(subsidiary => ({
     label: subsidiary.name,
     value: subsidiary.id
   }))
-})
-
-// Initialize data on component mount
-onMounted(async () => {
-  initializeSection()
-  await fetchSubsidiaries()
 })
 
 // Add Malaysian states data
@@ -332,10 +612,118 @@ const showSubsidiaries = computed(() => {
   const selected = kooperasiList.value.find(k => k.id === selectedKoperasi.value);
   return selected?.hasSubsidiaries;
 });
+
+// Update getUploadStatus function
+const getUploadStatus = (type) => {
+  const statement = uploadedStatements.value?.[type];
+  if (!statement || !statement.id || !statement.statementFile?.name) return null;
+  
+  return {
+    id: statement.id,
+    statementFile: statement.statementFile || { name: '', path: '' },
+    referenceFile: statement.referenceFile,
+    uploadedAt: statement.uploadedAt,
+    status: statement.status
+  };
+};
+
+// Update downloadFile function
+const downloadFile = (url, filename) => {
+  if (!url || !filename) {
+    console.error('Invalid file information');
+    showErrorToast('Fail tidak dapat dimuat turun');
+    return;
+  }
+
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    showErrorToast('Gagal memuat turun fail');
+  }
+};
+
+// Add loading state
+const isLoading = ref(false);
+const apiError = ref(null);
+
+// Add section validation computed properties
+const isKooperasiDetailsComplete = computed(() => {
+  if (isLoading.value) return false;
+  
+  if (isParentOrganization.value) {
+    return kooperasiDetails.value.negeri &&
+           kooperasiDetails.value.tahunKewanganSemasa &&
+           kooperasiDetails.value.tahunKewanganSebelum &&
+           kooperasiDetails.value.diauditOleh &&
+           kooperasiDetails.value.disemakOleh;
+  } else {
+    return kooperasiDetails.value.subsidiariKoperasi &&
+           kooperasiDetails.value.negeri &&
+           kooperasiDetails.value.tahunKewanganSemasa &&
+           kooperasiDetails.value.tahunKewanganSebelum &&
+           kooperasiDetails.value.diauditOleh &&
+           kooperasiDetails.value.disemakOleh;
+  }
+});
+
+const isKunciKiraKiraComplete = computed(() => {
+  return uploadedStatements.value?.kunciKiraKira?.id != null;
+});
+
+const isImbanganDugaComplete = computed(() => {
+  return uploadedStatements.value?.imbanganDuga?.id != null;
+});
+
+const isLedgerComplete = computed(() => {
+  return uploadedStatements.value?.ledger?.id != null;
+});
+
+const isBankReconciliationComplete = computed(() => {
+  return uploadedStatements.value?.bankReconciliation?.id != null;
+});
+
+const canProceedToNext = computed(() => {
+  switch (currentSection.value) {
+    case 0: // Butiran Koperasi
+      return isKooperasiDetailsComplete.value;
+    case 1: // Kunci Kira Kira
+      return isKunciKiraKiraComplete.value;
+    case 2: // Imbangan Duga
+      return isImbanganDugaComplete.value;
+    case 3: // Ledger
+      return isLedgerComplete.value;
+    case 4: // Bank Reconciliation
+      return isBankReconciliationComplete.value;
+    case 5: // Overall Review
+      return true;
+    default:
+      return false;
+  }
+});
+
+// Add new ref for active tab
+const activeTab = ref('kunciKiraKira');
 </script>
 
 <template>
   <div>
+    <!-- Add loading overlay -->
+    <div v-if="isLoading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-lg flex items-center space-x-4">
+        <Icon name="eos-icons:loading" class="w-8 h-8 text-blue-500 animate-spin" />
+        <span class="text-lg">Memuat data...</span>
+      </div>
+    </div>
+
+    <!-- Add Toast component with position -->
+    <Toast position="top-right" />
+
     <div class="mb-6">
       <h1 class="text-2xl font-semibold">{{ pageTitle }}</h1>
     </div>
@@ -448,6 +836,34 @@ const showSubsidiaries = computed(() => {
                 :disabled="uploadStatus.kunciKiraKira.loading"
                 method="post"
               >
+                <!-- Show uploaded file status -->
+                <div v-if="getUploadStatus('kunciKiraKira')?.id && getUploadStatus('kunciKiraKira')?.statementFile?.name" class="mb-4 p-4 bg-green-50 rounded-lg border border-green-100">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-green-700 font-medium">Fail telah dimuat naik</p>
+                      <p class="text-sm text-green-600">
+                        {{ getUploadStatus('kunciKiraKira')?.statementFile?.name }}
+                      </p>
+                      <p class="text-xs text-green-500">
+                        {{ getUploadStatus('kunciKiraKira')?.uploadedAt ? 
+                           new Date(getUploadStatus('kunciKiraKira').uploadedAt).toLocaleString() : 
+                           'Date not available' }}
+                      </p>
+                    </div>
+                    <button 
+                      v-if="getUploadStatus('kunciKiraKira')?.statementFile?.path"
+                      @click="downloadFile(
+                        getUploadStatus('kunciKiraKira').statementFile.path, 
+                        getUploadStatus('kunciKiraKira').statementFile.name
+                      )"
+                      class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all flex items-center"
+                    >
+                      <Icon name="material-symbols:download" class="w-5 h-5 mr-2" />
+                      Muat Turun
+                    </button>
+                  </div>
+                </div>
+
                 <FormKit
                   type="file"
                   @change="(event) => handleFileChange(event, 'kunciKiraKira', 'statement')"
@@ -490,7 +906,15 @@ const showSubsidiaries = computed(() => {
             </CardContent>
           </Card>
           <template v-if="isReviewVisible">
-            <div class="mt-8 space-y-6">
+            <!-- Add analyzing state indicator -->
+            <div v-if="analyzingStatus.kunciKiraKira" class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <div class="flex items-center space-x-3">
+                <Icon name="eos-icons:loading" class="w-6 h-6 text-blue-500 animate-spin" />
+                <p class="text-blue-700">Sedang menganalisis dokumen...</p>
+              </div>
+            </div>
+
+            <div v-else class="mt-8 space-y-6">
               <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Dokumen</h3>
                 <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
@@ -595,6 +1019,33 @@ const showSubsidiaries = computed(() => {
           <h2 class="text-xl font-semibold my-4">Imbangan Duga</h2>
           <Card class="mb-4">
             <CardContent>
+              <!-- Upload status and form -->
+              <div v-if="getUploadStatus('imbanganDuga')?.id && getUploadStatus('imbanganDuga')?.statementFile?.name" class="mb-4 p-4 bg-green-50 rounded-lg border border-green-100">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-green-700 font-medium">Fail telah dimuat naik</p>
+                    <p class="text-sm text-green-600">
+                      {{ getUploadStatus('imbanganDuga')?.statementFile?.name }}
+                    </p>
+                    <p class="text-xs text-green-500">
+                      {{ getUploadStatus('imbanganDuga')?.uploadedAt ? 
+                         new Date(getUploadStatus('imbanganDuga').uploadedAt).toLocaleString() : 
+                         'Date not available' }}
+                    </p>
+                  </div>
+                  <button 
+                    v-if="getUploadStatus('imbanganDuga')?.statementFile?.path"
+                    @click="downloadFile(
+                      getUploadStatus('imbanganDuga').statementFile.path, 
+                      getUploadStatus('imbanganDuga').statementFile.name
+                    )"
+                    class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all flex items-center"
+                  >
+                    <Icon name="material-symbols:download" class="w-5 h-5 mr-2" />
+                    Muat Turun
+                  </button>
+                </div>
+              </div>
               <FormKit
                 type="form"
                 id="imbanganDugaForm"
@@ -642,6 +1093,115 @@ const showSubsidiaries = computed(() => {
                   {{ uploadStatus.imbanganDuga.error }}
                 </p>
               </FormKit>
+
+              <!-- Add analyzing state indicator -->
+              <div v-if="analyzingStatus.imbanganDuga" class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div class="flex items-center space-x-3">
+                  <Icon name="eos-icons:loading" class="w-6 h-6 text-blue-500 animate-spin" />
+                  <p class="text-blue-700">Sedang menganalisis dokumen...</p>
+                </div>
+              </div>
+
+              <!-- Add review section -->
+              <div v-else-if="documentReview.imbanganDuga.sections.length > 0" class="mt-8 space-y-6">
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Dokumen</h3>
+                  <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                </div>
+
+                <div v-for="(section, sectionIndex) in documentReview.imbanganDuga.sections"
+                     :key="sectionIndex"
+                     class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                  </div>
+                  
+                  <div class="p-4 space-y-4">
+                    <div v-for="(issue, issueIndex) in section.issues"
+                         :key="issueIndex"
+                         class="bg-white rounded-lg p-4 border border-slate-200">
+                      <div class="flex items-center gap-2 mb-3">
+                        <div :class="{
+                          'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                          'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                        }" class="px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.impactLevel }} Isu
+                        </div>
+                        <div class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.faultCategory }}
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Penerangan Isu</h5>
+                            <p class="text-slate-600">{{ issue.issueDescription }}</p>
+                          </div>
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Hasil Yang Dijangka</h5>
+                            <p class="text-slate-600">{{ issue.expected }}</p>
+                          </div>
+                        </div>
+                        <div class="pt-2">
+                          <h5 class="text-sm font-medium text-slate-700">Cadangan Pembetulan</h5>
+                          <p class="text-slate-600">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Summary section -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">Ringkasan Semakan</h4>
+                  </div>
+                  
+                  <div class="p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <div class="text-red-800 text-2xl font-bold">
+                          {{ documentReview.imbanganDuga.summary.totalMajorIssues }}
+                        </div>
+                        <div class="text-red-600 text-sm">Isu Utama</div>
+                      </div>
+                      
+                      <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <div class="text-yellow-800 text-2xl font-bold">
+                          {{ documentReview.imbanganDuga.summary.totalMinorIssues }}
+                        </div>
+                        <div class="text-yellow-600 text-sm">Isu Kecil</div>
+                      </div>
+                      
+                      <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div class="text-blue-800 text-2xl font-bold">
+                          {{ documentReview.imbanganDuga.summary.totalRalatDokumen }}
+                        </div>
+                        <div class="text-blue-600 text-sm">Pembetulan Dokumen</div>
+                      </div>
+                      
+                      <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                        <div class="text-green-800 text-2xl font-bold">
+                          {{ documentReview.imbanganDuga.summary.sectionsRequiringRevisions.length }}
+                        </div>
+                        <div class="text-green-600 text-sm">Bahagian Memerlukan Semakan</div>
+                      </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-lg">
+                      <h5 class="text-sm font-medium text-slate-700 mb-2">Bahagian Memerlukan Semakan:</h5>
+                      <div class="flex flex-wrap gap-2">
+                        <span v-for="section in documentReview.imbanganDuga.summary.sectionsRequiringRevisions"
+                              :key="section"
+                              class="bg-white px-3 py-1 rounded-full text-sm text-slate-600 border border-slate-200">
+                          {{ section }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -697,6 +1257,115 @@ const showSubsidiaries = computed(() => {
                   {{ uploadStatus.ledger.error }}
                 </p>
               </FormKit>
+
+              <!-- Add analyzing state indicator -->
+              <div v-if="analyzingStatus.ledger" class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div class="flex items-center space-x-3">
+                  <Icon name="eos-icons:loading" class="w-6 h-6 text-blue-500 animate-spin" />
+                  <p class="text-blue-700">Sedang menganalisis dokumen...</p>
+                </div>
+              </div>
+
+              <!-- Add review section -->
+              <div v-else-if="documentReview.ledger.sections.length > 0" class="mt-8 space-y-6">
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Dokumen</h3>
+                  <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                </div>
+
+                <div v-for="(section, sectionIndex) in documentReview.ledger.sections"
+                     :key="sectionIndex"
+                     class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                  </div>
+                  
+                  <div class="p-4 space-y-4">
+                    <div v-for="(issue, issueIndex) in section.issues"
+                         :key="issueIndex"
+                         class="bg-white rounded-lg p-4 border border-slate-200">
+                      <div class="flex items-center gap-2 mb-3">
+                        <div :class="{
+                          'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                          'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                        }" class="px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.impactLevel }} Isu
+                        </div>
+                        <div class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.faultCategory }}
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Penerangan Isu</h5>
+                            <p class="text-slate-600">{{ issue.issueDescription }}</p>
+                          </div>
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Hasil Yang Dijangka</h5>
+                            <p class="text-slate-600">{{ issue.expected }}</p>
+                          </div>
+                        </div>
+                        <div class="pt-2">
+                          <h5 class="text-sm font-medium text-slate-700">Cadangan Pembetulan</h5>
+                          <p class="text-slate-600">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Summary section -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">Ringkasan Semakan</h4>
+                  </div>
+                  
+                  <div class="p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <div class="text-red-800 text-2xl font-bold">
+                          {{ documentReview.ledger.summary.totalMajorIssues }}
+                        </div>
+                        <div class="text-red-600 text-sm">Isu Utama</div>
+                      </div>
+                      
+                      <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <div class="text-yellow-800 text-2xl font-bold">
+                          {{ documentReview.ledger.summary.totalMinorIssues }}
+                        </div>
+                        <div class="text-yellow-600 text-sm">Isu Kecil</div>
+                      </div>
+                      
+                      <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div class="text-blue-800 text-2xl font-bold">
+                          {{ documentReview.ledger.summary.totalRalatDokumen }}
+                        </div>
+                        <div class="text-blue-600 text-sm">Pembetulan Dokumen</div>
+                      </div>
+                      
+                      <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                        <div class="text-green-800 text-2xl font-bold">
+                          {{ documentReview.ledger.summary.sectionsRequiringRevisions.length }}
+                        </div>
+                        <div class="text-green-600 text-sm">Bahagian Memerlukan Semakan</div>
+                      </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-lg">
+                      <h5 class="text-sm font-medium text-slate-700 mb-2">Bahagian Memerlukan Semakan:</h5>
+                      <div class="flex flex-wrap gap-2">
+                        <span v-for="section in documentReview.ledger.summary.sectionsRequiringRevisions"
+                              :key="section"
+                              class="bg-white px-3 py-1 rounded-full text-sm text-slate-600 border border-slate-200">
+                          {{ section }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -752,6 +1421,115 @@ const showSubsidiaries = computed(() => {
                   {{ uploadStatus.bankReconciliation.error }}
                 </p>
               </FormKit>
+
+              <!-- Add analyzing state indicator -->
+              <div v-if="analyzingStatus.bankReconciliation" class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div class="flex items-center space-x-3">
+                  <Icon name="eos-icons:loading" class="w-6 h-6 text-blue-500 animate-spin" />
+                  <p class="text-blue-700">Sedang menganalisis dokumen...</p>
+                </div>
+              </div>
+
+              <!-- Add review section -->
+              <div v-else-if="documentReview.bankReconciliation.sections.length > 0" class="mt-8 space-y-6">
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Dokumen</h3>
+                  <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                </div>
+
+                <div v-for="(section, sectionIndex) in documentReview.bankReconciliation.sections"
+                     :key="sectionIndex"
+                     class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                  </div>
+                  
+                  <div class="p-4 space-y-4">
+                    <div v-for="(issue, issueIndex) in section.issues"
+                         :key="issueIndex"
+                         class="bg-white rounded-lg p-4 border border-slate-200">
+                      <div class="flex items-center gap-2 mb-3">
+                        <div :class="{
+                          'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                          'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                        }" class="px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.impactLevel }} Isu
+                        </div>
+                        <div class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
+                          {{ issue.faultCategory }}
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Penerangan Isu</h5>
+                            <p class="text-slate-600">{{ issue.issueDescription }}</p>
+                          </div>
+                          <div>
+                            <h5 class="text-sm font-medium text-slate-700">Hasil Yang Dijangka</h5>
+                            <p class="text-slate-600">{{ issue.expected }}</p>
+                          </div>
+                        </div>
+                        <div class="pt-2">
+                          <h5 class="text-sm font-medium text-slate-700">Cadangan Pembetulan</h5>
+                          <p class="text-slate-600">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Summary section -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                  <div class="p-4 border-b border-slate-200 bg-slate-50">
+                    <h4 class="text-lg font-medium text-slate-800">Ringkasan Semakan</h4>
+                  </div>
+                  
+                  <div class="p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <div class="text-red-800 text-2xl font-bold">
+                          {{ documentReview.bankReconciliation.summary.totalMajorIssues }}
+                        </div>
+                        <div class="text-red-600 text-sm">Isu Utama</div>
+                      </div>
+                      
+                      <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <div class="text-yellow-800 text-2xl font-bold">
+                          {{ documentReview.bankReconciliation.summary.totalMinorIssues }}
+                        </div>
+                        <div class="text-yellow-600 text-sm">Isu Kecil</div>
+                      </div>
+                      
+                      <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div class="text-blue-800 text-2xl font-bold">
+                          {{ documentReview.bankReconciliation.summary.totalRalatDokumen }}
+                        </div>
+                        <div class="text-blue-600 text-sm">Pembetulan Dokumen</div>
+                      </div>
+                      
+                      <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                        <div class="text-green-800 text-2xl font-bold">
+                          {{ documentReview.bankReconciliation.summary.sectionsRequiringRevisions.length }}
+                        </div>
+                        <div class="text-green-600 text-sm">Bahagian Memerlukan Semakan</div>
+                      </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-lg">
+                      <h5 class="text-sm font-medium text-slate-700 mb-2">Bahagian Memerlukan Semakan:</h5>
+                      <div class="flex flex-wrap gap-2">
+                        <span v-for="section in documentReview.bankReconciliation.summary.sectionsRequiringRevisions"
+                              :key="section"
+                              class="bg-white px-3 py-1 rounded-full text-sm text-slate-600 border border-slate-200">
+                          {{ section }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -797,79 +1575,227 @@ const showSubsidiaries = computed(() => {
             </div>
           </div>
 
-          <!-- Document-wise Review Sections -->
-          <div class="space-y-6">
-            <!-- Kunci Kira Kira Review -->
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200">
-              <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                <h3 class="text-lg font-medium text-slate-800">Semakan Kunci Kira Kira</h3>
-                <div class="flex gap-2">
-                  <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-sm">
-                    {{ documentReview.kunciKiraKira.summary.totalMajorIssues }} Utama
-                  </span>
-                  <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">
-                    {{ documentReview.kunciKiraKira.summary.totalMinorIssues }} Kecil
-                  </span>
-                </div>
-              </div>
-              <div class="p-4">
-                <div v-for="(section, index) in documentReview.kunciKiraKira.sections"
-                     :key="index"
-                     class="mb-4 last:mb-0">
-                  <h4 class="font-medium text-slate-700 mb-2">{{ section.section }}</h4>
-                  <div class="space-y-3">
-                    <div v-for="(issue, issueIndex) in section.issues"
-                         :key="issueIndex"
-                         class="bg-slate-50 p-3 rounded-lg">
-                      <div class="flex items-center gap-2 mb-2">
-                        <span :class="{
-                          'bg-red-100 text-red-700': issue.impactLevel === 'Major',
-                          'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
-                        }" class="px-2 py-1 rounded-full text-sm">
-                          {{ issue.impactLevel }}
-                        </span>
-                        <span class="text-slate-600">{{ issue.faultCategory }}</span>
+          <!-- Document Reviews in Tabs -->
+          <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+            <div class="p-4">
+              <Tabs v-model="activeTab" class="w-full">
+                <TabsList class="mb-4">
+                  <TabsTrigger value="kunciKiraKira">
+                    <div class="flex items-center space-x-2">
+                      <span>Kunci Kira Kira</span>
+                      <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">
+                        {{ documentReview.kunciKiraKira.summary.totalMajorIssues }}
+                      </span>
+                    </div>
+                  </TabsTrigger>
+                  <TabsTrigger value="imbanganDuga">
+                    <div class="flex items-center space-x-2">
+                      <span>Imbangan Duga</span>
+                      <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">
+                        {{ documentReview.imbanganDuga.summary.totalMajorIssues }}
+                      </span>
+                    </div>
+                  </TabsTrigger>
+                  <TabsTrigger value="ledger">
+                    <div class="flex items-center space-x-2">
+                      <span>Ledger</span>
+                      <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">
+                        {{ documentReview.ledger.summary.totalMajorIssues }}
+                      </span>
+                    </div>
+                  </TabsTrigger>
+                  <TabsTrigger value="bankReconciliation">
+                    <div class="flex items-center space-x-2">
+                      <span>Penyelarasan Bank</span>
+                      <span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">
+                        {{ documentReview.bankReconciliation.summary.totalMajorIssues }}
+                      </span>
+                    </div>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="kunciKiraKira">
+                  <div class="space-y-6">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Kunci Kira Kira</h3>
+                      <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                    </div>
+
+                    <div v-for="(section, index) in documentReview.kunciKiraKira.sections"
+                         :key="index"
+                         class="bg-white rounded-lg shadow-sm border border-slate-200">
+                      <div class="p-4 border-b border-slate-200 bg-slate-50">
+                        <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
                       </div>
-                      <p class="text-slate-700">{{ issue.issueDescription }}</p>
-                      <p class="text-slate-600 text-sm mt-1">{{ issue.suggestedCorrection }}</p>
+                      
+                      <div class="p-4 space-y-4">
+                        <div v-for="(issue, issueIndex) in section.issues"
+                             :key="issueIndex"
+                             class="bg-slate-50 p-4 rounded-lg">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span :class="{
+                              'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                              'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                            }" class="px-2 py-1 rounded-full text-sm">
+                              {{ issue.impactLevel }}
+                            </span>
+                            <span class="text-slate-600">{{ issue.faultCategory }}</span>
+                          </div>
+                          <p class="text-slate-700">{{ issue.issueDescription }}</p>
+                          <p class="text-slate-600 text-sm mt-1">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
+                </TabsContent>
 
-            <!-- Imbangan Duga Review -->
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200">
-              <!-- Similar structure as Kunci Kira Kira, but with Imbangan Duga data -->
-              <!-- ... -->
-            </div>
+                <TabsContent value="imbanganDuga">
+                  <div class="space-y-6">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Imbangan Duga</h3>
+                      <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                    </div>
 
-            <!-- Ledger Review -->
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200">
-              <!-- Similar structure as above, but with Ledger data -->
-              <!-- ... -->
-            </div>
+                    <div v-for="(section, index) in documentReview.imbanganDuga.sections"
+                         :key="index"
+                         class="bg-white rounded-lg shadow-sm border border-slate-200">
+                      <div class="p-4 border-b border-slate-200 bg-slate-50">
+                        <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                      </div>
+                      
+                      <div class="p-4 space-y-4">
+                        <div v-for="(issue, issueIndex) in section.issues"
+                             :key="issueIndex"
+                             class="bg-slate-50 p-4 rounded-lg">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span :class="{
+                              'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                              'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                            }" class="px-2 py-1 rounded-full text-sm">
+                              {{ issue.impactLevel }}
+                            </span>
+                            <span class="text-slate-600">{{ issue.faultCategory }}</span>
+                          </div>
+                          <p class="text-slate-700">{{ issue.issueDescription }}</p>
+                          <p class="text-slate-600 text-sm mt-1">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
 
-            <!-- Bank Reconciliation Review -->
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200">
-              <!-- Similar structure as above, but with Bank Reconciliation data -->
-              <!-- ... -->
+                <TabsContent value="ledger">
+                  <div class="space-y-6">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Ledger</h3>
+                      <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                    </div>
+
+                    <div v-for="(section, index) in documentReview.ledger.sections"
+                         :key="index"
+                         class="bg-white rounded-lg shadow-sm border border-slate-200">
+                      <div class="p-4 border-b border-slate-200 bg-slate-50">
+                        <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                      </div>
+                      
+                      <div class="p-4 space-y-4">
+                        <div v-for="(issue, issueIndex) in section.issues"
+                             :key="issueIndex"
+                             class="bg-slate-50 p-4 rounded-lg">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span :class="{
+                              'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                              'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                            }" class="px-2 py-1 rounded-full text-sm">
+                              {{ issue.impactLevel }}
+                            </span>
+                            <span class="text-slate-600">{{ issue.faultCategory }}</span>
+                          </div>
+                          <p class="text-slate-700">{{ issue.issueDescription }}</p>
+                          <p class="text-slate-600 text-sm mt-1">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="bankReconciliation">
+                  <div class="space-y-6">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 class="text-xl font-semibold text-slate-800">Analisis Semakan Penyelarasan Bank</h3>
+                      <p class="text-slate-600 text-sm mt-1">Semakan menyeluruh dokumen yang dimuat naik dan isu yang dikenal pasti</p>
+                    </div>
+
+                    <div v-for="(section, index) in documentReview.bankReconciliation.sections"
+                         :key="index"
+                         class="bg-white rounded-lg shadow-sm border border-slate-200">
+                      <div class="p-4 border-b border-slate-200 bg-slate-50">
+                        <h4 class="text-lg font-medium text-slate-800">{{ section.section }}</h4>
+                      </div>
+                      
+                      <div class="p-4 space-y-4">
+                        <div v-for="(issue, issueIndex) in section.issues"
+                             :key="issueIndex"
+                             class="bg-slate-50 p-4 rounded-lg">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span :class="{
+                              'bg-red-100 text-red-700': issue.impactLevel === 'Major',
+                              'bg-yellow-100 text-yellow-700': issue.impactLevel === 'Minor'
+                            }" class="px-2 py-1 rounded-full text-sm">
+                              {{ issue.impactLevel }}
+                            </span>
+                            <span class="text-slate-600">{{ issue.faultCategory }}</span>
+                          </div>
+                          <p class="text-slate-700">{{ issue.issueDescription }}</p>
+                          <p class="text-slate-600 text-sm mt-1">{{ issue.suggestedCorrection }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 
           <!-- Action Buttons -->
-          <div class="mt-6 flex justify-end space-x-4">
+          <!-- <div class="mt-6 flex justify-end space-x-4">
             <Button variant="outline" class="btn">
               <Icon name="material-symbols:download" class="mr-2" />
               Muat Turun Laporan
             </Button>
-          </div>
+          </div> -->
         </div>
 
         <div class="flex justify-between mt-4">
-          <Button @click="prevSection" :disabled="currentSection === 0" class="btn"><Icon name="material-symbols:chevron-left" class="mr-2"></Icon>Sebelumnya</Button>
-          <Button v-if="currentSection === sections.length - 1" @click="submitForm" class="btn"><Icon name="lsicon:submit-filled" class="mr-2"></Icon>Hantar</Button>
-          <Button v-else @click="nextSection" class="btn"><Icon name="material-symbols:chevron-right" class="mr-2"></Icon>Seterusnya</Button>
+          <Button 
+            @click="prevSection" 
+            :disabled="currentSection === 0" 
+            class="btn"
+            :class="{ 'opacity-50 cursor-not-allowed': currentSection === 0 }"
+          >
+            <Icon name="material-symbols:chevron-left" class="mr-2" />
+            Sebelumnya
+          </Button>
+          <Button 
+            v-if="currentSection === sections.length - 1" 
+            @click="submitForm" 
+            class="btn"
+            :disabled="!canProceedToNext"
+            :class="{ 'opacity-50 cursor-not-allowed': !canProceedToNext }"
+          >
+            <Icon name="lsicon:submit-filled" class="mr-2" />
+            Hantar
+          </Button>
+          <Button 
+            v-else 
+            @click="nextSection" 
+            class="btn"
+            :disabled="!canProceedToNext"
+            :class="{ 'opacity-50 cursor-not-allowed': !canProceedToNext }"
+          >
+            <Icon name="material-symbols:chevron-right" class="mr-2" />
+            Seterusnya
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -884,9 +1810,22 @@ const showSubsidiaries = computed(() => {
       </ModalBody>
       <ModalFooter>
         <Button variant="outline" @click="isOpen = false">Tutup</Button>
-        <Button @click="refreshPage">Sahkan</Button>
+        <!-- <Button @click="refreshPage">Sahkan</Button> -->
       </ModalFooter>
     </Modal>
 
   </div>
 </template>
+
+<style scoped>
+@keyframes fade-in-out {
+  0% { opacity: 0; transform: translateY(-1rem); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-1rem); }
+}
+
+.animate-fade-in-out {
+  animation: fade-in-out 3s ease-in-out;
+}
+</style>
