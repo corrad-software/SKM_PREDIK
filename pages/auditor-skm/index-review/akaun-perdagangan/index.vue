@@ -24,16 +24,16 @@ const tradingData = ref({
   sections: [
     {
       rows: [
-        { name: 'Jualan', link: 'T1', previousYear: '-', currentYear: '-' },
+        { name: 'Jualan', link: 'T1', previousYear: '1000', currentYear: '1200' },
         { name: 'TOLAK: KOS JUALAN', subheader: true },
-        { name: 'Stok Awal', link: 'T2', previousYear: '-', currentYear: '-' },
-        { name: 'Tambah: Belian', link: 'T3', previousYear: '-', currentYear: '-' },
-        { name: 'Tolak: Stok Akhir', link: 'T4', previousYear: '-', currentYear: '-' },
-        { name: 'Kos Jualan', total: true, previousYear: '-', currentYear: '-' },
-        { name: 'Keuntungan/(Kerugian) Kasar', total: true, previousYear: '-', currentYear: '-' },
-        { name: 'Tambah: Pendapatan Lain', link: 'T5', previousYear: '-', currentYear: '-' },
-        { name: 'Tolak: Perbelanjaan Lain', link: 'T6', previousYear: '-', currentYear: '-' },
-        { name: 'Keuntungan/(Kerugian) Aktiviti', total: true, previousYear: '-', currentYear: '-' }
+        { name: 'Stok Awal', link: 'T2', previousYear: '300', currentYear: '400' },
+        { name: 'Tambah: Belian', link: 'T3', previousYear: '500', currentYear: '600' },
+        { name: 'Tolak: Stok Akhir', link: 'T4', previousYear: '200', currentYear: '300' },
+        { name: 'Kos Jualan', total: true, previousYear: '600', currentYear: '700' },
+        { name: 'Keuntungan/(Kerugian) Kasar', total: true, previousYear: '400', currentYear: '500' },
+        { name: 'Tambah: Pendapatan Lain', link: 'T5', previousYear: '100', currentYear: '150' },
+        { name: 'Tolak: Perbelanjaan Lain', link: 'T6', previousYear: '50', currentYear: '70' },
+        { name: 'Keuntungan/(Kerugian) Aktiviti', total: true, previousYear: '450', currentYear: '580' }
       ]
     }
   ]
