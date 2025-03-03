@@ -1,6 +1,16 @@
 <script setup>
+import { useRouter } from 'vue-router';
+
 definePageMeta({
   layout: "admin",
+});
+
+// Add to the data structure at the top, after definePageMeta
+const showKuiriPopup = ref(false);
+const kuiriData = ref({
+  question: '',
+  response: '',
+  status: 'pending'
 });
 
 // Update ledger data structure
@@ -127,10 +137,162 @@ const pelarasanData = ref({
   ]
 });
 
+// Update ledger data with more comprehensive values
+ledgerData.value = {
+  title: 'SURUHANJAYA KOPERASI MALAYSIA',
+  subtitle: 'BAHAGIAN AUDIT KOPERASI',
+  koperasi: 'KOPERASI ABC BERHAD',
+  perkara: 'TANAH',
+  diauditOleh: 'AHMAD BIN ABDULLAH',
+  disemakOleh: 'SARAH BINTI IBRAHIM',
+  tarikhAudit: '2024-03-15',
+  tarikhSemak: '2024-03-20',
+  columns: [
+    { name: 'PERKARA', width: '300px' },
+    { name: 'REF', width: '80px' },
+    { 
+      name: 'DRAF KOPERASI',
+      subColumns: ['RM', 'RM']
+    },
+    { 
+      name: 'PELARASAN',
+      subColumns: ['RM', 'RM']
+    },
+    { 
+      name: 'TAHUN SEMAKAN',
+      subColumns: ['RM', 'RM']
+    }
+  ],
+  rows: [
+    {
+      code: 'T1',
+      name: 'Tanah Lot 123, Mukim Kajang',
+      pic: 'Ahmad',
+      type: 'item',
+      values: {
+        'PERKARA': { value: 'Tanah Lot 123, Mukim Kajang' },
+        'REF': { value: 'HM123456' },
+        'DRAF KOPERASI': { debit: '250000.00', kredit: '0.00', debitBg: false, kreditBg: false },
+        'PELARASAN': { debit: '0.00', kredit: '50000.00', debitBg: false, kreditBg: true },
+        'TAHUN SEMAKAN': { debit: '200000.00', kredit: '0.00', debitBg: true, kreditBg: false }
+      }
+    },
+    {
+      code: 'T2',
+      name: 'Tanah Lot 456, Mukim Semenyih',
+      pic: 'Sarah',
+      type: 'item',
+      values: {
+        'PERKARA': { value: 'Tanah Lot 456, Mukim Semenyih' },
+        'REF': { value: 'HM789012' },
+        'DRAF KOPERASI': { debit: '180000.00', kredit: '0.00', debitBg: false, kreditBg: false },
+        'PELARASAN': { debit: '20000.00', kredit: '0.00', debitBg: true, kreditBg: false },
+        'TAHUN SEMAKAN': { debit: '200000.00', kredit: '0.00', debitBg: true, kreditBg: false }
+      }
+    },
+    {
+      code: 'T3',
+      name: 'Tanah Lot 789, Mukim Cheras',
+      pic: 'Ahmad',
+      type: 'item',
+      values: {
+        'PERKARA': { value: 'Tanah Lot 789, Mukim Cheras' },
+        'REF': { value: 'HM345678' },
+        'DRAF KOPERASI': { debit: '300000.00', kredit: '0.00', debitBg: false, kreditBg: false },
+        'PELARASAN': { debit: '0.00', kredit: '25000.00', debitBg: false, kreditBg: true },
+        'TAHUN SEMAKAN': { debit: '275000.00', kredit: '0.00', debitBg: true, kreditBg: false }
+      }
+    },
+    {
+      code: 'T4',
+      name: 'Tanah Lot 321, Mukim Ampang',
+      pic: 'Sarah',
+      type: 'item',
+      values: {
+        'PERKARA': { value: 'Tanah Lot 321, Mukim Ampang' },
+        'REF': { value: 'HM901234' },
+        'DRAF KOPERASI': { debit: '420000.00', kredit: '0.00', debitBg: false, kreditBg: false },
+        'PELARASAN': { debit: '30000.00', kredit: '0.00', debitBg: true, kreditBg: false },
+        'TAHUN SEMAKAN': { debit: '450000.00', kredit: '0.00', debitBg: true, kreditBg: false }
+      }
+    },
+    {
+      code: 'TJ',
+      name: 'JUMLAH',
+      pic: '',
+      type: 'header',
+      values: {
+        'PERKARA': { value: 'JUMLAH' },
+        'REF': { value: '' },
+        'DRAF KOPERASI': { debit: '1150000.00', kredit: '0.00', debitBg: true, kreditBg: false },
+        'PELARASAN': { debit: '50000.00', kredit: '75000.00', debitBg: true, kreditBg: true },
+        'TAHUN SEMAKAN': { debit: '1125000.00', kredit: '0.00', debitBg: true, kreditBg: false }
+      }
+    }
+  ],
+  auditCodes: [
+    { code: 'θ', desc: 'seperti akaun teraudit' },
+    { code: 'lg', desc: 'seperti dengan lejar' },
+    { code: '^', desc: 'semak pengiraan' },
+    { code: 'C', desc: 'pengesahan dihantar' },
+    { code: 'CB', desc: 'baki disahkan' },
+    { code: 'P', desc: 'pindahan' },
+    { code: 'pv', desc: 'disemak dengan baucer bayaran' },
+    { code: 'R', desc: 'disemak dengan resit' },
+    { code: 'i', desc: 'disemak dengan inbois' },
+    { code: 'BS', desc: 'disemak dengan penyata bank' },
+    { code: 'Ag', desc: 'disemak dengan perjanjian' }
+  ]
+};
+
+// Update pelarasan data with corresponding adjustments
+pelarasanData.value = {
+  rows: [
+    { 
+      tarikh: '2024-03-01', 
+      pendapatan: 'Pelarasan nilai tanah Lot 123 berdasarkan penilaian terkini oleh jurunilai bertauliah', 
+      dt: '', 
+      kt: '50000.00' 
+    },
+    { 
+      tarikh: '2024-03-01', 
+      pendapatan: 'Pelarasan nilai tanah Lot 456 - Kos tambahan pembangunan infrastruktur', 
+      dt: '20000.00', 
+      kt: '' 
+    },
+    { 
+      tarikh: '2024-03-02', 
+      pendapatan: 'Pelarasan nilai tanah Lot 789 berdasarkan nilai pasaran semasa', 
+      dt: '', 
+      kt: '25000.00' 
+    },
+    { 
+      tarikh: '2024-03-02', 
+      pendapatan: 'Pelarasan nilai tanah Lot 321 - Penambahbaikan kemudahan', 
+      dt: '30000.00', 
+      kt: '' 
+    },
+    // ... remaining empty rows ...
+  ]
+};
+
+// Add at the top of the script section, after definePageMeta
+const router = useRouter();
+
+// Update the buttons array with navigation actions
 const buttons = [
-  { label: 'MPKA', action: () => {} },
-  { label: 'JPA', action: () => {} },
-  { label: 'KUIRI', action: () => {} },
+  { 
+    label: 'MPKA', 
+    action: () => router.push('/auditor-skm/index-review/mpka')
+  },
+  { 
+    label: 'JPA', 
+    action: () => router.push('/auditor-skm/index-review/jpa')
+  },
+  { 
+    label: 'KUIRI', 
+    action: () => showKuiriPopup.value = true 
+  },
   { label: 'SIMPAN', action: () => {} },
   { label: 'SALIN', action: () => {} },
 ];
@@ -391,6 +553,74 @@ const buttons = [
         </div>
       </div>
     </div>
+
+    <!-- Add the Kuiri popup just before the closing </div> of the main container -->
+    <div v-if="showKuiriPopup" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold">Kuiri Audit</h3>
+          <button @click="showKuiriPopup = false" class="text-gray-500 hover:text-gray-700">
+            <span class="text-2xl">&times;</span>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Rujukan</label>
+            <input
+              type="text"
+              class="w-full border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Contoh: T1/2024/01"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Soalan Kuiri</label>
+            <textarea
+              v-model="kuiriData.question"
+              rows="4"
+              class="w-full border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Masukkan soalan kuiri di sini..."
+            ></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Maklum Balas</label>
+            <textarea
+              v-model="kuiriData.response"
+              rows="4"
+              class="w-full border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Maklum balas akan diisi oleh koperasi..."
+              disabled
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Dokumen Sokongan</label>
+            <input
+              type="file"
+              class="w-full border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              multiple
+            />
+          </div>
+          
+          <div class="flex justify-end gap-2">
+            <button
+              @click="showKuiriPopup = false"
+              class="px-4 py-2 border rounded-md hover:bg-gray-50"
+            >
+              Batal
+            </button>
+            <button
+              @click="showKuiriPopup = false"
+              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Hantar Kuiri
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -509,6 +739,28 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Add styles for the popup */
+.fixed {
+  position: fixed;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/* Add styles for file input */
+input[type="file"] {
+  @apply text-sm text-gray-500 
+    file:mr-4 file:py-2 file:px-4
+    file:rounded-md file:border-0
+    file:text-sm file:font-semibold
+    file:bg-blue-50 file:text-blue-700
+    hover:file:bg-blue-100;
 }
 </style>
 
