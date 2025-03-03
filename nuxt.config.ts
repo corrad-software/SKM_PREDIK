@@ -17,7 +17,7 @@ export default defineNuxtConfig({
         name: "OpenApiDocs",
         files: function () {
           return {
-            "financial-statement-api": "Financial Statement API"
+            "financial-statement-api": "Financial Statement API",
           };
         },
       },
@@ -30,26 +30,6 @@ export default defineNuxtConfig({
   fonts: {
     priority: ["google"],
     provider: "google",
-  },
-  app: {
-    head: {
-      script: [
-        {
-          innerHTML: `(function() {
-            try {
-              const theme = localStorage.getItem('theme') || 
-                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default');
-              
-              if (theme !== 'default') {
-                document.documentElement.classList.add('theme-' + theme);
-              }
-              document.documentElement.style.colorScheme = theme;
-            } catch (e) {}
-          })()`,
-          type: "text/javascript",
-        },
-      ],
-    },
   },
   runtimeConfig: {
     // Private keys are only available on the server

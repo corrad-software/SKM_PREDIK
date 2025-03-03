@@ -4,21 +4,45 @@ definePageMeta({
 });
 
 const searchQuery = ref('');
-
 const selectedKoperasi = ref(null);
 const selectedAnakSyarikat = ref(null);
 
-const koperasiOptions = [
-  { value: 'koperasi1', label: 'Koperasi 1' },
-  { value: 'koperasi2', label: 'Koperasi 2' }
-];
+// Fetch organizations from API
+const { data: organizationResponse } = await useFetch('/api/organization/list', {
+  method: 'GET'
+});
 
+// Transform organizations into dropdown options
+const koperasiOptions = computed(() => {
+  if (!organizationResponse.value?.status === 'success') return [];
+  
+  return organizationResponse.value.data.organizations.map(org => ({
+    value: org.id,
+    label: org.name,
+    data: org // Store full organization data for later use
+  }));
+});
+
+// Get selected koperasi data
+const selectedKoperasiData = computed(() => {
+  if (!selectedKoperasi.value) return null;
+  return koperasiOptions.value.find(opt => opt.value === selectedKoperasi.value)?.data;
+});
+
+// Transform subsidiaries into dropdown options based on selected koperasi
 const anakSyarikatOptions = computed(() => {
-  if (!selectedKoperasi.value) return [];
-  return [
-    { value: 'anak1', label: 'Anak Syarikat 1' },
-    { value: 'anak2', label: 'Anak Syarikat 2' }
-  ];
+  if (!selectedKoperasiData.value) return [];
+  
+  return selectedKoperasiData.value.children.map(child => ({
+    value: child.id,
+    label: child.name,
+    data: child
+  }));
+});
+
+// Reset anak syarikat selection when koperasi changes
+watch(selectedKoperasi, () => {
+  selectedAnakSyarikat.value = null;
 });
 
 const documentSections = ref([
@@ -35,7 +59,7 @@ const documentSections = ref([
           { 
             name: 'Kunci Kira-Kira',
             icon: 'ic:round-account-balance',
-            path: '/auditor-skm/index-review/kunci-kira-kira'
+            path: computed(() => `/auditor-skm/index-review/kunci-kira-kira?organization_id=${selectedAnakSyarikat.value || ''}`)
           },
           { 
             name: 'Akaun Pembahagian Keuntungan',

@@ -52,12 +52,12 @@ export default defineEventHandler(async (event) => {
     }
 
     // Verify organization is of type 'child'
-    if (organization.organization_type !== CONSTANTS.ORGANIZATION_TYPE.CHILD) {
-      throw createError({
-        statusCode: 400,
-        message: "Financial statements can only be uploaded for child organizations",
-      });
-    }
+    // if (organization.organization_type !== CONSTANTS.ORGANIZATION_TYPE.CHILD) {
+    //   throw createError({
+    //     statusCode: 400,
+    //     message: "Financial statements can only be uploaded for child organizations",
+    //   });
+    // }
 
     // Validate statement types
     const validTypes = ['kunci_kira_kira', 'imbangan_duga', 'ledger', 'bank_reconciliation'];

@@ -16,11 +16,19 @@ const supabase = createClient(
   }
 );
 
+// Define document types to check
+const DOCUMENT_TYPES = {
+  KUNCI_KIRA: 'kunci_kira_kira',
+  IMBANGAN_DUGA: 'imbangan_duga',
+  LEDGER: 'ledger',
+  BANK_RECON: 'bank_reconciliation'
+};
+
 export default defineEventHandler(async (event) => {
   try {
     const id = event.context.params.id;
 
-    // Get organization details with relationships and financial statements
+    // Get organization details with relationships, financial statements, and current year
     const { data: organization, error: orgError } = await supabase
       .from('organizations')
       .select(`
@@ -28,6 +36,7 @@ export default defineEventHandler(async (event) => {
         name,
         description,
         bank_account,
+        organization_type,
         status,
         created_at,
         updated_at,
@@ -37,6 +46,7 @@ export default defineEventHandler(async (event) => {
             name,
             description,
             bank_account,
+            organization_type,
             status,
             created_at,
             updated_at
@@ -47,6 +57,8 @@ export default defineEventHandler(async (event) => {
             id,
             name,
             description,
+            bank_account,
+            organization_type,
             status
           )
         ),
@@ -59,11 +71,25 @@ export default defineEventHandler(async (event) => {
           uploaded_at,
           updated_at,
           analysis_result,
+          year_current,
+          year_previous,
           reference_file:reference_files!financial_statements_reference_file_id_fkey (
             id,
             file_name,
             file_path,
             file_url
+          )
+        ),
+        statement_groups (
+          id,
+          name,
+          description,
+          ledger_generation_jobs (
+            id,
+            status,
+            result,
+            created_at,
+            updated_at
           )
         )
       `)
@@ -85,10 +111,16 @@ export default defineEventHandler(async (event) => {
       name: child.child.name,
       description: child.child.description,
       bank_account: child.child.bank_account,
+      organization_type: child.child.organization_type,
       status: child.child.status,
       created_at: child.child.created_at,
       updated_at: child.child.updated_at
     })) || [];
+
+    // Get the most recent year from financial statements
+    const currentYear = organization.financial_statements?.reduce((latest, stmt) => {
+      return stmt.year_current > latest ? stmt.year_current : latest;
+    }, 0) || new Date().getFullYear();
 
     // Process financial statements
     const statements = (organization.financial_statements || []).map(stmt => {
@@ -114,9 +146,37 @@ export default defineEventHandler(async (event) => {
         uploaded_at: stmt.uploaded_at,
         updated_at: stmt.updated_at,
         analysis_result: stmt.analysis_result,
+        year_current: stmt.year_current,
+        year_previous: stmt.year_previous,
         reference_file: referenceFile
       };
     });
+
+    // Check document upload status
+    const uploadedDocuments = {
+      [DOCUMENT_TYPES.KUNCI_KIRA]: statements.some(s => s.statement_type === DOCUMENT_TYPES.KUNCI_KIRA),
+      [DOCUMENT_TYPES.IMBANGAN_DUGA]: statements.some(s => s.statement_type === DOCUMENT_TYPES.IMBANGAN_DUGA),
+      [DOCUMENT_TYPES.LEDGER]: statements.some(s => s.statement_type === DOCUMENT_TYPES.LEDGER),
+      [DOCUMENT_TYPES.BANK_RECON]: statements.some(s => s.statement_type === DOCUMENT_TYPES.BANK_RECON)
+    };
+
+    // Process statement groups and ledger jobs
+    const statementGroups = organization.statement_groups?.map(group => {
+      const latestSuccessfulJob = group.ledger_generation_jobs?.find(job => 
+        job.status === 'completed' && job.result
+      );
+
+      return {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        existing_ledger: latestSuccessfulJob ? {
+          job_id: latestSuccessfulJob.id,
+          generated_at: latestSuccessfulJob.updated_at,
+          result: latestSuccessfulJob.result
+        } : null
+      };
+    }) || [];
 
     return {
       status: "success",
@@ -125,9 +185,11 @@ export default defineEventHandler(async (event) => {
         name: organization.name,
         description: organization.description,
         bank_account: organization.bank_account,
+        organization_type: organization.organization_type,
         status: organization.status,
         created_at: organization.created_at,
         updated_at: organization.updated_at,
+        current_year: currentYear,
         parent,
         children,
         statements: {
@@ -136,8 +198,10 @@ export default defineEventHandler(async (event) => {
           by_type: statements.reduce((acc, stmt) => {
             acc[stmt.statement_type] = (acc[stmt.statement_type] || 0) + 1;
             return acc;
-          }, {})
-        }
+          }, {}),
+          uploaded_documents: uploadedDocuments
+        },
+        statement_groups: statementGroups
       }
     };
 

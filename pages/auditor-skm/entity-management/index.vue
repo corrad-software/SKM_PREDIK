@@ -150,66 +150,79 @@ definePageMeta({
   layout: "admin",
 });
 
-import { ref } from 'vue'
+const { data: organizationResponse } = await useFetch('/api/organization/list', {
+  method: 'GET'
+})
 
-const cooperatives = ref([
-  {
-    id: 1,
-    name: 'Koperasi Serbaguna Global Berhad',
-    regNo: 'K-1234-1990-M',
-    documents: [
-      { type: 'kunci_kira', name: 'Kunci Kira-Kira', uploaded: true, url: '/auditor-skm/index-review/kunci-kira-kira' },
-      { type: 'imbangan_duga', name: 'Imbangan Duga', uploaded: false },
-      { type: 'ledger', name: 'Ledger', uploaded: true, url: '/auditor-skm/index-review/ledger' },
-      { type: 'bank_reconciliation', name: 'Bank Reconciliation', uploaded: false }
-    ],
-    subsidiaries: [
-      {
-        name: 'Global Trading Sdn Bhd',
-        ssmNo: '199301012345',
+const cooperatives = ref([])
+
+// Transform API response to match our UI structure
+watchEffect(() => {
+  if (organizationResponse.value?.status === 'success') {
+    cooperatives.value = organizationResponse.value.data.organizations.map(org => ({
+      id: org.id,
+      name: org.name,
+      regNo: org.bank_account,
+      documents: [
+        { 
+          type: 'kunci_kira', 
+          name: 'Kunci Kira-Kira', 
+          uploaded: org.statements.uploaded_documents.kunci_kira_kira,
+          url: org.statements.items.find(s => s.statement_type === 'kunci_kira_kira')?.file_url || null
+        },
+        { 
+          type: 'imbangan_duga', 
+          name: 'Imbangan Duga', 
+          uploaded: org.statements.uploaded_documents.imbangan_duga,
+          url: org.statements.items.find(s => s.statement_type === 'imbangan_duga')?.file_url || null
+        },
+        { 
+          type: 'ledger', 
+          name: 'Ledger', 
+          uploaded: org.statements.uploaded_documents.ledger,
+          url: org.statements.items.find(s => s.statement_type === 'ledger')?.file_url || null
+        },
+        { 
+          type: 'bank_reconciliation', 
+          name: 'Bank Reconciliation', 
+          uploaded: org.statements.uploaded_documents.bank_reconciliation,
+          url: org.statements.items.find(s => s.statement_type === 'bank_reconciliation')?.file_url || null
+        }
+      ],
+      subsidiaries: org.children.map(child => ({
+        id: child.id,
+        name: child.name,
+        ssmNo: child.bank_account,
         documents: [
-          { type: 'kunci_kira', name: 'Kunci Kira-Kira', uploaded: true, url: '/auditor-skm/index-review/kunci-kira-kira' },
-          { type: 'imbangan_duga', name: 'Imbangan Duga', uploaded: true, url: '/auditor-skm/index-review/imbangan-duga' },
-          { type: 'ledger', name: 'Ledger', uploaded: false },
-          { type: 'bank_reconciliation', name: 'Bank Reconciliation', uploaded: true, url: '/auditor-skm/index-review/bank-reconciliation' }
+          { 
+            type: 'kunci_kira', 
+            name: 'Kunci Kira-Kira', 
+            uploaded: child.statements.uploaded_documents.kunci_kira_kira,
+            url: child.statements.items.find(s => s.statement_type === 'kunci_kira_kira')?.file_url || null
+          },
+          { 
+            type: 'imbangan_duga', 
+            name: 'Imbangan Duga', 
+            uploaded: child.statements.uploaded_documents.imbangan_duga,
+            url: child.statements.items.find(s => s.statement_type === 'imbangan_duga')?.file_url || null
+          },
+          { 
+            type: 'ledger', 
+            name: 'Ledger', 
+            uploaded: child.statements.uploaded_documents.ledger,
+            url: child.statements.items.find(s => s.statement_type === 'ledger')?.file_url || null
+          },
+          { 
+            type: 'bank_reconciliation', 
+            name: 'Bank Reconciliation', 
+            uploaded: child.statements.uploaded_documents.bank_reconciliation,
+            url: child.statements.items.find(s => s.statement_type === 'bank_reconciliation')?.file_url || null
+          }
         ]
-      },
-      {
-        name: 'Global Mart Enterprise Sdn Bhd',
-        ssmNo: '199401012346',
-        documents: [
-          { type: 'kunci_kira', name: 'Kunci Kira-Kira', uploaded: false },
-          { type: 'imbangan_duga', name: 'Imbangan Duga', uploaded: false },
-          { type: 'ledger', name: 'Ledger', uploaded: false },
-          { type: 'bank_reconciliation', name: 'Bank Reconciliation', uploaded: false }
-        ]
-      }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Kooperasi Rakyat',
-    regNo: 'K-2345-1954-M',
-    documents: [
-      { type: 'kunci_kira', name: 'Kunci Kira-Kira', uploaded: true, url: '/auditor-skm/index-review/kunci-kira-kira' },
-      { type: 'imbangan_duga', name: 'Imbangan Duga', uploaded: true, url: '/auditor-skm/index-review/imbangan-duga' },
-      { type: 'ledger', name: 'Ledger', uploaded: true, url: '/auditor-skm/index-review/ledger' },
-      { type: 'bank_reconciliation', name: 'Bank Reconciliation', uploaded: true, url: '/auditor-skm/index-review/bank-reconciliation' }
-    ],
-    subsidiaries: [
-      {
-        name: 'Rakyat Holdings Sdn Bhd',
-        ssmNo: '199501012347',
-        documents: [
-          { type: 'kunci_kira', name: 'Kunci Kira-Kira', uploaded: true, url: '/auditor-skm/index-review/kunci-kira-kira' },
-          { type: 'imbangan_duga', name: 'Imbangan Duga', uploaded: false },
-          { type: 'ledger', name: 'Ledger', uploaded: true, url: '/auditor-skm/index-review/ledger' },
-          { type: 'bank_reconciliation', name: 'Bank Reconciliation', uploaded: true, url: '/auditor-skm/index-review/bank-reconciliation' }
-        ]
-      }
-    ]
+      }))
+    }))
   }
-])
+})
 
 const expandedCoops = ref({})
 
@@ -218,30 +231,29 @@ const toggleSubsidiaries = (index) => {
 }
 
 const viewDocument = (doc) => {
-  // Implementation for document viewing
-  window.open(doc.url, '_blank')
+  if (doc.url) {
+    window.open(doc.url, '_blank')
+  }
 }
 
 const hasIncompleteDocuments = (documents) => {
   return documents.some(doc => !doc.uploaded)
 }
 
-const sendReminder = async (coop) => {
+const sendReminder = async (entity) => {
   try {
-    // Show loading state
     const toast = useToast()
     toast.info('Menghantar peringatan...', { duration: 1000 })
 
-    // Simulate API call
+    // Simulate API call - In real implementation, you would call your reminder API endpoint
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Show success message
-    toast.success(`Peringatan telah dihantar kepada ${coop.name}`, {
+    toast.success(`Peringatan telah dihantar kepada ${entity.name}`, {
       duration: 3000,
       description: 'Pihak syarikat akan dimaklumkan mengenai dokumen yang belum lengkap'
     })
   } catch (error) {
-    // Show error message
+    const toast = useToast()
     toast.error('Gagal menghantar peringatan', {
       duration: 3000,
       description: 'Sila cuba lagi sebentar'
@@ -249,11 +261,10 @@ const sendReminder = async (coop) => {
   }
 }
 
-// Add composable for toast notifications
+// Toast utility
 const useToast = () => {
   return {
     success: (message, options = {}) => {
-      // Implementation would depend on your toast library
       console.log('Success:', message, options)
     },
     error: (message, options = {}) => {

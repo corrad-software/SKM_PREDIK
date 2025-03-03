@@ -55,6 +55,7 @@ export default defineEventHandler(async (event) => {
         created_at,
         updated_at,
         statement_group_items (
+          id,
           statement_id,
           statement_type,
           financial_statements (
@@ -66,6 +67,13 @@ export default defineEventHandler(async (event) => {
             updated_at,
             analysis_result
           )
+        ),
+        ledger_generation_jobs (
+          id,
+          status,
+          result,
+          created_at,
+          updated_at
         )
       `)
       .eq('organization_id', organization_id)
@@ -80,51 +88,34 @@ export default defineEventHandler(async (event) => {
 
     // Process and format the response
     const formattedGroups = groups.map(group => {
-      // Count statements by type and status
-      const statementStats = {
-        total: 0,
-        by_type: {},
-        by_status: {},
-        has_issues: false
-      };
-
-      // Calculate total issues across all statements
-      let totalMajorIssues = 0;
-      let totalMinorIssues = 0;
-
-      group.statement_group_items?.forEach(item => {
+      // Process statement items
+      const items = group.statement_group_items?.map(item => {
         const statement = item.financial_statements;
-        if (statement) {
-          // Increment total
-          statementStats.total++;
-
-          // Count by type
-          statementStats.by_type[item.statement_type] = 
-            (statementStats.by_type[item.statement_type] || 0) + 1;
-
-          // Count by status
-          statementStats.by_status[statement.status] = 
-            (statementStats.by_status[statement.status] || 0) + 1;
-
-          // Check for issues in analysis result
-          if (statement.analysis_result) {
-            totalMajorIssues += statement.analysis_result.total_major_issues || 0;
-            totalMinorIssues += statement.analysis_result.total_minor_issues || 0;
-            if ((statement.analysis_result.total_major_issues || 0) > 0 ||
-                (statement.analysis_result.total_minor_issues || 0) > 0) {
-              statementStats.has_issues = true;
-            }
-          }
-        }
-      });
-
-      // Add issue counts if any issues exist
-      if (totalMajorIssues > 0 || totalMinorIssues > 0) {
-        statementStats.issues = {
-          total_major_issues: totalMajorIssues,
-          total_minor_issues: totalMinorIssues
+        return {
+          id: item.id,
+          type: item.statement_type,
+          statement: statement ? {
+            id: statement.id,
+            fileName: statement.file_name,
+            type: statement.statement_type,
+            status: statement.status,
+            uploadedAt: statement.uploaded_at,
+            updatedAt: statement.updated_at,
+            hasIssues: statement.analysis_result ? 
+              (statement.analysis_result.total_major_issues > 0 || statement.analysis_result.total_minor_issues > 0) : 
+              false,
+            issues: statement.analysis_result ? {
+              major: statement.analysis_result.total_major_issues || 0,
+              minor: statement.analysis_result.total_minor_issues || 0
+            } : null
+          } : null
         };
-      }
+      }) || [];
+
+      // Get the latest successful ledger job
+      const latestSuccessfulJob = group.ledger_generation_jobs?.find(job => 
+        job.status === 'completed' && job.result
+      );
 
       return {
         id: group.id,
@@ -133,7 +124,22 @@ export default defineEventHandler(async (event) => {
         organization_id: group.organization_id,
         created_at: group.created_at,
         updated_at: group.updated_at,
-        statements: statementStats
+        items: items,
+        summary: {
+          total: items.length,
+          has_issues: items.some(item => item.statement?.hasIssues),
+          issues: {
+            total_major_issues: items.reduce((sum, item) => 
+              sum + (item.statement?.issues?.major || 0), 0),
+            total_minor_issues: items.reduce((sum, item) => 
+              sum + (item.statement?.issues?.minor || 0), 0)
+          }
+        },
+        existing_ledger: latestSuccessfulJob ? {
+          job_id: latestSuccessfulJob.id,
+          generated_at: latestSuccessfulJob.updated_at,
+          result: latestSuccessfulJob.result
+        } : null
       };
     });
 

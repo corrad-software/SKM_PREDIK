@@ -22,10 +22,12 @@
     "@vueuse/core": "^11.3.0",
     "ai": "^4.1.45",
     "exceljs": "^4.4.0",
+    "form-data": "^4.0.2",
     "meilisearch": "^0.48.2",
     "nuxt": "^3.15.4",
     "nuxt-openapi-docs-module": "^5.3.1",
     "prismjs": "^1.29.0",
+    "uuid": "^11.1.0",
     "vue": "latest",
     "vue-router": "latest",
     "zod": "^3.24.2"
