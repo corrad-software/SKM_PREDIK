@@ -251,55 +251,174 @@ const selectLedger = (event) => {
 // Add sample data for Materiality and Audit Sampling
 const materialityData = ref({
   overallLevel: 'MEDIUM',
-  categories: [
-    {
-      name: 'Financial Materiality',
-      level: 'HIGH',
-      description: 'Significant financial impact due to material misstatements.',
-      recommendations: [
-        'Review financial statements for accuracy.',
-        'Ensure compliance with accounting standards.'
-      ],
-      isOpen: false
-    },
-    {
-      name: 'Operational Materiality',
-      level: 'MEDIUM',
-      description: 'Moderate operational impact due to inefficiencies.',
-      recommendations: [
-        'Optimize operational processes.',
-        'Conduct regular performance reviews.'
-      ],
-      isOpen: false
-    }
-  ]
+  benchmark: {
+    selected: '',
+    value: '',
+    options: [
+      { value: 'sales', label: 'Jualan' },
+      { value: 'assets', label: 'Jumlah Aset' },
+      { value: 'expenses', label: 'Perbelanjaan' }
+    ]
+  },
+  percentages: {
+    materiality: '',
+    performanceMateriality: '',
+    clearlyTrivial: ''
+  },
+  calculations: {
+    materiality: 0,
+    performanceMateriality: 0,
+    clearlyTrivial: 0
+  }
 });
 
 const auditSamplingData = ref({
   overallLevel: 'MEDIUM',
-  categories: [
-    {
-      name: 'Random Sampling',
-      level: 'LOW',
-      description: 'Low risk of sampling errors due to random selection.',
-      recommendations: [
-        'Ensure randomness in sample selection.',
-        'Review sampling methodology.'
-      ],
-      isOpen: false
+  population: {
+    dateRange: {
+      start: '',
+      end: ''
     },
-    {
-      name: 'Stratified Sampling',
-      level: 'MEDIUM',
-      description: 'Moderate risk due to stratification of data.',
-      recommendations: [
-        'Validate stratification criteria.',
-        'Review stratified sample results.'
-      ],
-      isOpen: false
-    }
-  ]
+    valueRange: {
+      min: '',
+      max: ''
+    },
+    transactionType: '',
+    transactionTypes: [
+      { value: 'purchases', label: 'Transaksi Pembelian' },
+      { value: 'sales', label: 'Transaksi Jualan' },
+      { value: 'payments', label: 'Transaksi Pembayaran' },
+      { value: 'receipts', label: 'Transaksi Penerimaan' },
+      { value: 'loans', label: 'Transaksi Pinjaman' },
+      { value: 'investments', label: 'Transaksi Pelaburan' },
+      { value: 'operating_expenses', label: 'Transaksi Perbelanjaan Operasi' },
+      { value: 'fixed_assets', label: 'Transaksi Aset Tetap' },
+      { value: 'inventory', label: 'Transaksi Inventori' },
+      { value: 'other_financial', label: 'Transaksi Kewangan Lain-lain' },
+      { value: 'equity', label: 'Transaksi Modal' },
+      { value: 'accruals', label: 'Transaksi Perakaunan Akruan' },
+      { value: 'adjustments', label: 'Transaksi Pelarasan' },
+      { value: 'international', label: 'Transaksi Antarabangsa' },
+      { value: 'donations', label: 'Transaksi Amal atau Sumbangan' }
+    ]
+  },
+  method: {
+    selected: '',
+    options: [
+      { 
+        value: 'random', 
+        label: 'Random Sampling',
+        description: 'Pemilihan item secara rawak dari keseluruhan populasi tanpa sebarang bias atau pola tertentu.'
+      },
+      { 
+        value: 'systematic', 
+        label: 'Systematic Sampling',
+        description: 'Pemilihan item pada selang tetap (contohnya setiap transaksi ke-10 dalam senarai).'
+      },
+      { 
+        value: 'stratified', 
+        label: 'Stratified Sampling',
+        description: 'Populasi dibahagikan kepada subkumpulan (strata) berdasarkan ciri-ciri tertentu.'
+      }
+    ]
+  },
+  sampleSize: {
+    method: 'manual',
+    manualSize: '',
+    automatic: {
+      auditRisk: '',
+      materiality: '',
+      confidenceLevel: ''
+    },
+    calculatedSize: 0
+  },
+  selectedSamples: []
 });
+
+// Add calculation function
+const calculateMateriality = () => {
+  const benchmarkValue = parseFloat(materialityData.value.benchmark.value) || 0;
+  const materialityPercent = parseFloat(materialityData.value.percentages.materiality) || 0;
+  const pmlPercent = parseFloat(materialityData.value.percentages.performanceMateriality) || 0;
+  const cttPercent = parseFloat(materialityData.value.percentages.clearlyTrivial) || 0;
+
+  // Calculate Materiality
+  const materiality = benchmarkValue * (materialityPercent / 100);
+  materialityData.value.calculations.materiality = materiality;
+
+  // Calculate Performance Materiality
+  const pml = materiality * (pmlPercent / 100);
+  materialityData.value.calculations.performanceMateriality = pml;
+
+  // Calculate Clearly Trivial Threshold
+  const ctt = pml * (cttPercent / 100);
+  materialityData.value.calculations.clearlyTrivial = ctt;
+};
+
+// Update the calculateSampleSize function
+const calculateSampleSize = () => {
+  if (auditSamplingData.value.sampleSize.method === 'manual') {
+    // For manual input, directly use the input value
+    auditSamplingData.value.sampleSize.calculatedSize = 
+      parseInt(auditSamplingData.value.sampleSize.manualSize) || 0;
+  } else {
+    // For automatic calculation
+    const risk = parseFloat(auditSamplingData.value.sampleSize.automatic.auditRisk) || 0;
+    const materiality = parseFloat(auditSamplingData.value.sampleSize.automatic.materiality) || 0;
+    const confidence = parseFloat(auditSamplingData.value.sampleSize.automatic.confidenceLevel) || 0;
+    
+    // Example calculation (replace with actual formula)
+    auditSamplingData.value.sampleSize.calculatedSize = 
+      Math.ceil((confidence / (risk * materiality)) * 100);
+  }
+};
+
+// Add helper function to generate random date between two dates
+const getRandomDate = (start, end) => {
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const timeDiff = endDate.getTime() - startDate.getTime();
+  const randomTime = Math.random() * timeDiff;
+  const randomDate = new Date(startDate.getTime() + randomTime);
+  
+  // Format date as YYYY-MM-DD
+  return randomDate.toISOString().split('T')[0];
+};
+
+// Update the selectSamples function
+const selectSamples = () => {
+  const sampleSize = auditSamplingData.value.sampleSize.calculatedSize;
+  const startDate = auditSamplingData.value.population.dateRange.start;
+  const endDate = auditSamplingData.value.population.dateRange.end;
+
+  if (sampleSize <= 0) {
+    alert('Sila kira saiz sampel terlebih dahulu');
+    return;
+  }
+
+  if (!startDate || !endDate) {
+    alert('Sila pilih tempoh masa terlebih dahulu');
+    return;
+  }
+
+  // Generate samples with dates within the selected range
+  const samples = Array(sampleSize).fill(null).map((_, index) => {
+    const randomDate = getRandomDate(startDate, endDate);
+    return {
+      id: 101 + index,
+      date: randomDate,
+      type: Math.random() > 0.5 ? 'Debit' : 'Kredit',
+      accountCode: 1234 + index,
+      amount: (Math.random() * 5000).toFixed(2),
+      description: 'Pembayaran Utiliti'
+    };
+  });
+
+  // Sort samples by date
+  samples.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  auditSamplingData.value.selectedSamples = samples;
+};
 </script>
 
 <template>
@@ -456,44 +575,92 @@ const auditSamplingData = ref({
 
           <!-- Panel Content -->
           <div class="p-4 overflow-y-auto h-full pb-20">
-            <!-- Materiality Level -->
+            <!-- Update Benchmark Selection to Dropdown -->
             <div class="mb-6">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Tahap Materialiti Keseluruhan:</span>
-                <span class="px-3 py-1 rounded-full text-white font-medium text-sm bg-yellow-500">
-                  {{ materialityData.overallLevel }}
-                </span>
-              </div>
+              <h3 class="text-lg font-medium mb-4">Pemilihan Benchmark (Asas Pengiraan)</h3>
+              <select v-model="materialityData.benchmark.selected" class="w-full border rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="" disabled>Pilih Benchmark</option>
+                <option v-for="option in materialityData.benchmark.options" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
             </div>
 
-            <!-- Materiality Categories -->
-            <div class="space-y-4">
-              <div v-for="category in materialityData.categories" 
-                  :key="category.name" 
-                  class="border rounded-lg">
-                <div class="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                  <div class="flex flex-col space-y-2">
-                    <span class="font-medium">{{ category.name }}</span>
-                    <div class="flex space-x-2">
-                      <span class="px-2 py-1 rounded-full text-white text-sm bg-yellow-500">
-                        {{ category.level }}
-                      </span>
-                    </div>
-                  </div>
+            <!-- Benchmark Value -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Nilai Benchmark (RM)
+              </label>
+              <input type="number"
+                     v-model="materialityData.benchmark.value"
+                     class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="Contoh: 1000000">
+            </div>
+
+            <!-- Materiality Percentage -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Peratusan Materiality (%)
+              </label>
+              <input type="number"
+                     v-model="materialityData.percentages.materiality"
+                     class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="Contoh: 1.5"
+                     step="0.1">
+            </div>
+
+            <!-- Performance Materiality Percentage -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Peratusan Performance Materiality (50%-75%)
+              </label>
+              <input type="number"
+                     v-model="materialityData.percentages.performanceMateriality"
+                     class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="Contoh: 75"
+                     min="50"
+                     max="75">
+            </div>
+
+            <!-- Clearly Trivial Threshold Percentage -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Peratusan Clearly Trivial Threshold (5%-10%)
+              </label>
+              <input type="number"
+                     v-model="materialityData.percentages.clearlyTrivial"
+                     class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="Contoh: 10"
+                     min="5">
+            </div>
+
+            <!-- Calculate Button -->
+            <button @click="calculateMateriality"
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mb-6">
+              Kira Materiality
+            </button>
+
+            <!-- Results -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h3 class="text-lg font-medium mb-4">Keputusan Pengiraan</h3>
+              <div class="space-y-3">
+                <div>
+                  <span class="text-gray-600">Materiality:</span>
+                  <span class="font-medium ml-2">
+                    RM{{ materialityData.calculations.materiality.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
                 </div>
-                
-                <div class="p-3 border-t bg-gray-50">
-                  <p class="text-gray-600 mb-2">{{ category.description }}</p>
-                  <div class="mt-2">
-                    <h4 class="font-medium mb-1">Cadangan:</h4>
-                    <ul class="list-disc list-inside text-gray-600">
-                      <li v-for="rec in category.recommendations" 
-                          :key="rec" 
-                          class="ml-2">
-                        {{ rec }}
-                      </li>
-                    </ul>
-                  </div>
+                <div>
+                  <span class="text-gray-600">Performance Materiality:</span>
+                  <span class="font-medium ml-2">
+                    RM{{ materialityData.calculations.performanceMateriality.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
+                </div>
+                <div>
+                  <span class="text-gray-600">Clearly Trivial Threshold:</span>
+                  <span class="font-medium ml-2">
+                    RM{{ materialityData.calculations.clearlyTrivial.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -515,52 +682,204 @@ const auditSamplingData = ref({
 
           <!-- Panel Content -->
           <div class="p-4 overflow-y-auto h-full pb-20">
-            <!-- Audit Sampling Level -->
-            <div class="mb-6">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Tahap Persampelan Audit Keseluruhan:</span>
-                <span class="px-3 py-1 rounded-full text-white font-medium text-sm bg-yellow-500">
-                  {{ auditSamplingData.overallLevel }}
-                </span>
+            <!-- 1. Takrifkan Populasi -->
+            <div class="mb-8">
+              <h3 class="text-lg font-medium mb-4">1. Takrifkan Populasi</h3>
+              
+              <!-- Date Range -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tempoh Masa</label>
+                <div class="flex space-x-4">
+                  <input type="date" 
+                         v-model="auditSamplingData.population.dateRange.start"
+                         class="border rounded-md px-3 py-2 w-1/2">
+                  <input type="date" 
+                         v-model="auditSamplingData.population.dateRange.end"
+                         class="border rounded-md px-3 py-2 w-1/2">
+                </div>
+              </div>
+
+              <!-- Value Range -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Julat Nilai (RM)</label>
+                <div class="flex space-x-4">
+                  <input type="number" 
+                         v-model="auditSamplingData.population.valueRange.min"
+                         placeholder="Nilai Minimum"
+                         class="border rounded-md px-3 py-2 w-1/2">
+                  <input type="number" 
+                         v-model="auditSamplingData.population.valueRange.max"
+                         placeholder="Nilai Maksimum"
+                         class="border rounded-md px-3 py-2 w-1/2">
+                </div>
+              </div>
+
+              <!-- Transaction Type -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Transaksi</label>
+                <select v-model="auditSamplingData.population.transactionType"
+                        class="w-full border rounded-md px-3 py-2">
+                  <option value="">Pilih Jenis Transaksi</option>
+                  <option v-for="type in auditSamplingData.population.transactionTypes"
+                          :key="type.value"
+                          :value="type.value">
+                    {{ type.label }}
+                  </option>
+                </select>
               </div>
             </div>
 
-            <!-- Audit Sampling Categories -->
-            <div class="space-y-4">
-              <div v-for="category in auditSamplingData.categories" 
-                  :key="category.name" 
-                  class="border rounded-lg">
-                <div class="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                  <div class="flex flex-col space-y-2">
-                    <span class="font-medium">{{ category.name }}</span>
-                    <div class="flex space-x-2">
-                      <span class="px-2 py-1 rounded-full text-white text-sm bg-yellow-500">
-                        {{ category.level }}
-                      </span>
+            <!-- 2. Tentukan Kaedah Sampling -->
+            <div class="mb-8">
+              <h3 class="text-lg font-medium mb-4">2. Tentukan Kaedah Sampling</h3>
+              <div class="space-y-4">
+                <div v-for="method in auditSamplingData.method.options"
+                     :key="method.value"
+                     class="border rounded-lg p-4"
+                     :class="{'border-blue-500 bg-blue-50': auditSamplingData.method.selected === method.value}">
+                  <div class="flex items-center">
+                    <input type="radio"
+                           :id="method.value"
+                           :value="method.value"
+                           v-model="auditSamplingData.method.selected"
+                           class="h-4 w-4 text-blue-600">
+                    <label :for="method.value" class="ml-2 font-medium">{{ method.label }}</label>
+                  </div>
+                  <p class="mt-2 text-sm text-gray-600">{{ method.description }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Tentukan Saiz Sampel -->
+            <div class="mb-8">
+              <h3 class="text-lg font-medium mb-4">3. Tentukan Saiz Sampel</h3>
+              
+              <!-- Method Selection -->
+              <div class="mb-4">
+                <select v-model="auditSamplingData.sampleSize.method"
+                        class="w-full border rounded-md px-3 py-2">
+                  <option value="manual">Manual</option>
+                  <option value="automatic">Automatik</option>
+                </select>
+              </div>
+
+              <!-- Manual Input -->
+              <div v-if="auditSamplingData.sampleSize.method === 'manual'" class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Saiz Sampel</label>
+                <input type="number"
+                       v-model="auditSamplingData.sampleSize.manualSize"
+                       class="w-full border rounded-md px-3 py-2"
+                       placeholder="Masukkan saiz sampel">
+              </div>
+
+              <!-- Automatic Calculation -->
+              <div v-else class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Risiko Audit (%)</label>
+                  <input type="number"
+                         v-model="auditSamplingData.sampleSize.automatic.auditRisk"
+                         class="w-full border rounded-md px-3 py-2"
+                         placeholder="Contoh: 5">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Materialiti (%)</label>
+                  <input type="number"
+                         v-model="auditSamplingData.sampleSize.automatic.materiality"
+                         class="w-full border rounded-md px-3 py-2"
+                         placeholder="Contoh: 10">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Tahap Keyakinan (%)</label>
+                  <input type="number"
+                         v-model="auditSamplingData.sampleSize.automatic.confidenceLevel"
+                         class="w-full border rounded-md px-3 py-2"
+                         placeholder="Contoh: 95">
+                </div>
+              </div>
+
+              <!-- Calculate Button -->
+              <button @click="calculateSampleSize"
+                      class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-4">
+                Kira Saiz Sampel
+              </button>
+
+              <!-- Display Calculated Size -->
+              <div v-if="auditSamplingData.sampleSize.calculatedSize > 0"
+                   class="mt-4 p-4 bg-gray-50 rounded-lg">
+                <div class="text-lg font-medium">Output Saiz Sampel:</div>
+                <div class="mt-2">
+                  <span class="text-gray-700">Saiz Sampel:</span>
+                  <span class="ml-2 font-medium">{{ auditSamplingData.sampleSize.calculatedSize }} transaksi</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Pilih Sampel -->
+            <div class="mb-8">
+              <button @click="selectSamples"
+                      class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                Jana Sampel
+              </button>
+
+              <!-- Display Selected Samples -->
+              <div v-if="auditSamplingData.selectedSamples.length > 0" class="mt-4">
+                <!-- Summary Header -->
+                <div class="mb-4 bg-white p-4 rounded-lg shadow">
+                  <h4 class="font-medium text-lg mb-2">Tajuk: Paparan Data Sampel</h4>
+                  <div class="text-sm text-gray-600">
+                    <div>KAEDAH SAMPLING: {{ auditSamplingData.method.selected === 'random' ? 'Random Sampling' : 
+                                            auditSamplingData.method.selected === 'systematic' ? 'Systematic Sampling' : 
+                                            'Stratified Sampling' }}</div>
+                    <div>SAIZ SAMPEL: {{ auditSamplingData.selectedSamples.length }} transaksi</div>
+                  </div>
+                </div>
+
+                <!-- Table with scroll containers -->
+                <div class="bg-white rounded-lg shadow">
+                  <div class="max-h-[400px] overflow-y-auto"> <!-- Vertical scroll -->
+                    <div class="overflow-x-auto"> <!-- Horizontal scroll -->
+                      <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0 z-10"> <!-- Sticky header -->
+                          <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">No. Transaksi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Tarikh Transaksi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Jenis Transaksi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Kod Akaun</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Amaun (RM)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Keterangan</th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                          <tr v-for="sample in auditSamplingData.selectedSamples" :key="sample.id">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ sample.id }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ sample.date }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ sample.type }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ sample.accountCode }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {{ sample.amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ sample.description }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
-                
-                <div class="p-3 border-t bg-gray-50">
-                  <p class="text-gray-600 mb-2">{{ category.description }}</p>
-                  <div class="mt-2">
-                    <h4 class="font-medium mb-1">Cadangan:</h4>
-                    <ul class="list-disc list-inside text-gray-600">
-                      <li v-for="rec in category.recommendations" 
-                          :key="rec" 
-                          class="ml-2">
-                        {{ rec }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+
+                <!-- Download Button -->
+                <button 
+                  class="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center gap-2"
+                >
+                  <Icon name="material-symbols:download" class="w-5 h-5" />
+                  Muat Turun Data Sampel Sebagai CSV/PDF
+                </button>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Backdrop -->
-        <div v-if="isRiskPanelOpen || isMaterialityPanelOpen || isAuditSamplingPanelOpen" 
+        <div v-if="isRiskPanelOpen || isMaterialityPanelOpen || isAuditSamplingPanel" 
             @click="toggleRiskPanel(); toggleMaterialityPanel(); toggleAuditSamplingPanel()"
             class="fixed inset-0 bg-black bg-opacity-25 transition-opacity duration-300 ease-in-out z-40">
         </div>

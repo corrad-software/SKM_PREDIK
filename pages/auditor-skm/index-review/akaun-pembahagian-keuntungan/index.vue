@@ -22,43 +22,43 @@ const formatCurrency = (value) => {
 const profitData = ref({
   title: 'AKAUN PEMBAHAGIAN KEUNTUNGAN',
   rows: [
-    { name: 'Untung/(Rugi) Bersih Tahun Semasa', kka: '54', previousYear: '-', currentYear: '-' },
-    { name: 'Campur/(Tolak): Pelarasan Operasi', kka: '54', previousYear: '-', currentYear: '-' },
-    { name: 'Untung/(Rugi) Bersih Selepas Pelarasan Operasi', previousYear: '-', currentYear: '-' },
-    { name: 'Tolak: (Kerugian) Terkumpul Pada Awal Tahun', previousYear: '-', currentYear: '-' },
-    { name: 'Untung/(Rugi) Bersih Selepas Kerugian Terkumpul', previousYear: '-', currentYear: '-' },
+    { name: 'Untung/(Rugi) Bersih Tahun Semasa', kka: '54', previousYear: '10000', currentYear: '12000' },
+    { name: 'Campur/(Tolak): Pelarasan Operasi', kka: '54', previousYear: '2000', currentYear: '2500' },
+    { name: 'Untung/(Rugi) Bersih Selepas Pelarasan Operasi', previousYear: '8000', currentYear: '9500' },
+    { name: 'Tolak: (Kerugian) Terkumpul Pada Awal Tahun', previousYear: '1000', currentYear: '1200' },
+    { name: 'Untung/(Rugi) Bersih Selepas Kerugian Terkumpul', previousYear: '7000', currentYear: '8300' },
     { 
       name: 'Tolak: Pembahagian Berkanun',
       items: [
-        { name: 'Kumpulan Wang Rizab Statutori', kka: '57', previousYear: '-', currentYear: '-' },
-        { name: 'Kumpulan Wang Amanah Pendidikan Koperasi', kka: '38', previousYear: '-', currentYear: '-' },
-        { name: 'Kumpulan Wang Amanah Pembangunan Koperasi', kka: '39', previousYear: '-', currentYear: '-' }
+        { name: 'Kumpulan Wang Rizab Statutori', kka: '57', previousYear: '500', currentYear: '600' },
+        { name: 'Kumpulan Wang Amanah Pendidikan Koperasi', kka: '38', previousYear: '300', currentYear: '400' },
+        { name: 'Kumpulan Wang Amanah Pembangunan Koperasi', kka: '39', previousYear: '200', currentYear: '250' }
       ]
     },
-    { name: 'Untung/(Rugi) Selepas Pembahagian Berkanun', previousYear: '-', currentYear: '-' },
+    { name: 'Untung/(Rugi) Selepas Pembahagian Berkanun', previousYear: '6000', currentYear: '7000' },
     {
       name: 'Tolak: Peruntukan Cukai',
       items: [
-        { name: 'Peruntukan Cukai', kka: '43', previousYear: '-', currentYear: '-' },
-        { name: 'Peruntukan Zakat', kka: '43', previousYear: '-', currentYear: '-' }
+        { name: 'Peruntukan Cukai', kka: '43', previousYear: '1000', currentYear: '1200' },
+        { name: 'Peruntukan Zakat', kka: '43', previousYear: '200', currentYear: '250' }
       ]
     },
     {
       name: 'Tolak: Lain-lain Pembahagian',
       items: [
-        { name: 'Pelbagai Langganan', kka: '43', previousYear: '-', currentYear: '-' },
-        { name: 'Dividen Atas Modal Syer Anggota', kka: '40', previousYear: '-', currentYear: '-' },
-        { name: 'Dividen Atas Modal/Yuran Anggota', kka: '40', previousYear: '-', currentYear: '-' },
-        { name: 'Honorarium Lembaga', kka: '41', previousYear: '-', currentYear: '-' },
-        { name: 'Kumpulan Wang/Tabung', kka: 'KW', previousYear: '-', currentYear: '-' },
-        { name: 'Lain-lain', kka: '43', previousYear: '-', currentYear: '-' }
+        { name: 'Pelbagai Langganan', kka: '43', previousYear: '150', currentYear: '180' },
+        { name: 'Dividen Atas Modal Syer Anggota', kka: '40', previousYear: '300', currentYear: '350' },
+        { name: 'Dividen Atas Modal/Yuran Anggota', kka: '40', previousYear: '250', currentYear: '300' },
+        { name: 'Honorarium Lembaga', kka: '41', previousYear: '100', currentYear: '120' },
+        { name: 'Kumpulan Wang/Tabung', kka: 'KW', previousYear: '50', currentYear: '60' },
+        { name: 'Lain-lain', kka: '43', previousYear: '30', currentYear: '40' }
       ]
     },
-    { name: 'Baki Keuntungan Yang Belum Dibahagi/Lebih/(Kurang)', previousYear: '-', currentYear: '-' },
-    { name: 'Campur/(Tolak): Pelarasan Bukan Operasi', kka: '55', previousYear: '-', currentYear: '-' },
-    { name: 'Keuntungan Terkumpul Pada Awal Tahun', previousYear: '-', currentYear: '-' },
-    { name: 'Keuntungan/(Kerugian) Terkumpul Pada Akhir Tahun', previousYear: '-', currentYear: '-' },
-    { name: 'PERBEZAAN KEUNTUNGAN/(KERUGIAN) KKK & APK', previousYear: '-', currentYear: '-' }
+    { name: 'Baki Keuntungan Yang Belum Dibahagi/Lebih/(Kurang)', previousYear: '500', currentYear: '600' },
+    { name: 'Campur/(Tolak): Pelarasan Bukan Operasi', kka: '55', previousYear: '100', currentYear: '120' },
+    { name: 'Keuntungan Terkumpul Pada Awal Tahun', previousYear: '4000', currentYear: '4500' },
+    { name: 'Keuntungan/(Kerugian) Terkumpul Pada Akhir Tahun', previousYear: '3000', currentYear: '3500' },
+    { name: 'PERBEZAAN KEUNTUNGAN/(KERUGIAN) KKK & APK', previousYear: '200', currentYear: '250' }
   ]
 });
 
