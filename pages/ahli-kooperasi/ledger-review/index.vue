@@ -1122,7 +1122,7 @@ const useExistingLedger = () => {
 
           <!-- Panel Content -->
           <div class="p-4 overflow-y-auto h-full pb-20">
-            <!-- Materiality Level -->
+            <!-- Update Benchmark Selection to Dropdown -->
             <div class="mb-6">
               <div class="flex items-center justify-between">
                 <span class="text-gray-600"
