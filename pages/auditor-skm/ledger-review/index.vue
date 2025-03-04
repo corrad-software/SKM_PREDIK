@@ -564,89 +564,28 @@ const auditSamplingData = ref({
   selectedSamples: []
 });
 
-// Add calculation function
-const calculateMateriality = () => {
-  const benchmarkValue = parseFloat(materialityData.value.benchmark.value) || 0;
-  const materialityPercent = parseFloat(materialityData.value.percentages.materiality) || 0;
-  const pmlPercent = parseFloat(materialityData.value.percentages.performanceMateriality) || 0;
-  const cttPercent = parseFloat(materialityData.value.percentages.clearlyTrivial) || 0;
-
-  // Calculate Materiality
-  const materiality = benchmarkValue * (materialityPercent / 100);
-  materialityData.value.calculations.materiality = materiality;
-
-  // Calculate Performance Materiality
-  const pml = materiality * (pmlPercent / 100);
-  materialityData.value.calculations.performanceMateriality = pml;
-
-  // Calculate Clearly Trivial Threshold
-  const ctt = pml * (cttPercent / 100);
-  materialityData.value.calculations.clearlyTrivial = ctt;
-};
-
-// Update the calculateSampleSize function
-const calculateSampleSize = () => {
-  if (auditSamplingData.value.sampleSize.method === 'manual') {
-    // For manual input, directly use the input value
-    auditSamplingData.value.sampleSize.calculatedSize = 
-      parseInt(auditSamplingData.value.sampleSize.manualSize) || 0;
-  } else {
-    // For automatic calculation
-    const risk = parseFloat(auditSamplingData.value.sampleSize.automatic.auditRisk) || 0;
-    const materiality = parseFloat(auditSamplingData.value.sampleSize.automatic.materiality) || 0;
-    const confidence = parseFloat(auditSamplingData.value.sampleSize.automatic.confidenceLevel) || 0;
-    
-    // Example calculation (replace with actual formula)
-    auditSamplingData.value.sampleSize.calculatedSize = 
-      Math.ceil((confidence / (risk * materiality)) * 100);
-  }
-};
-
-// Add helper function to generate random date between two dates
-const getRandomDate = (start, end) => {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  const timeDiff = endDate.getTime() - startDate.getTime();
-  const randomTime = Math.random() * timeDiff;
-  const randomDate = new Date(startDate.getTime() + randomTime);
+// Function to view existing ledger
+const viewExistingLedger = async () => {
+  if (!selectedGroupData.value?.existing_ledger) return;
   
-  // Format date as YYYY-MM-DD
-  return randomDate.toISOString().split('T')[0];
-};
-
-// Update the selectSamples function
-const selectSamples = () => {
-  const sampleSize = auditSamplingData.value.sampleSize.calculatedSize;
-  const startDate = auditSamplingData.value.population.dateRange.start;
-  const endDate = auditSamplingData.value.population.dateRange.end;
-
-  if (sampleSize <= 0) {
-    alert('Sila kira saiz sampel terlebih dahulu');
-    return;
+  loading.value = true;
+  error.value = null;
+  viewingExistingLedger.value = true;
+  
+  try {
+    // Load the existing ledger data
+    const existingLedger = selectedGroupData.value.existing_ledger;
+    ledgerData.value = existingLedger.result.ledger;
+    riskAssessment.value = existingLedger.result.riskAssessment;
+    materialityData.value = existingLedger.result.materiality;
+    auditSamplingData.value = existingLedger.result.auditSampling;
+    showLedger.value = true;
+  } catch (err) {
+    error.value = 'Failed to load existing ledger';
+    console.error('Error loading existing ledger:', err);
+  } finally {
+    loading.value = false;
   }
-
-  if (!startDate || !endDate) {
-    alert('Sila pilih tempoh masa terlebih dahulu');
-    return;
-  }
-
-  // Generate samples with dates within the selected range
-  const samples = Array(sampleSize).fill(null).map((_, index) => {
-    const randomDate = getRandomDate(startDate, endDate);
-    return {
-      id: 101 + index,
-      date: randomDate,
-      type: Math.random() > 0.5 ? 'Debit' : 'Kredit',
-      accountCode: 1234 + index,
-      amount: (Math.random() * 5000).toFixed(2),
-      description: 'Pembayaran Utiliti'
-    };
-  });
-
-  // Sort samples by date
-  samples.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  auditSamplingData.value.selectedSamples = samples;
 };
 </script>
 
