@@ -172,7 +172,7 @@ Pastikan:
             },
           ],
           temperature: 0.2,
-          maxTokens: 16384,
+          maxTokens: 2000,
           presencePenalty: 0,
           frequencyPenalty: 0,
           topP: 0.1,

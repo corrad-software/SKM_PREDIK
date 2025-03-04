@@ -16,7 +16,6 @@ const showLedger = ref(false);
 const selectedGroup = ref(null);
 const generationStatus = ref(null);
 const statementGroups = ref([]);
-const selectedGroupData = ref(null);
 
 // Panel visibility state
 const isRiskPanelOpen = ref(false);
@@ -26,10 +25,6 @@ const isAuditSamplingPanelOpen = ref(false);
 // Add reactive variables for job tracking
 const generationJobId = ref(null);
 const statusCheckInterval = ref(null);
-
-// Add new refs for viewing ledger
-const viewingExistingLedger = ref(false);
-const existingLedgerData = ref(null);
 
 // Fetch organizations from API
 const { data: organizationResponse } = await useFetch('/api/organization/list', {
@@ -141,13 +136,8 @@ watch(selectedAnakSyarikat, async (newValue) => {
   }
 });
 
-watch(selectedGroup, (newValue) => {
+watch(selectedGroup, () => {
   showLedger.value = false;
-  if (newValue) {
-    selectedGroupData.value = statementGroups.value.find(g => g.id === newValue);
-  } else {
-    selectedGroupData.value = null;
-  }
 });
 
 // Function to store job ID in localStorage
@@ -216,7 +206,6 @@ const generateLedger = async () => {
   error.value = null;
   generationStatus.value = null;
   showLedger.value = false;
-  viewingExistingLedger.value = false;
 
   try {
     const response = await $fetch('/api/financial-statement/generate-ledger', {
@@ -563,91 +552,6 @@ const auditSamplingData = ref({
   },
   selectedSamples: []
 });
-
-// Add calculation function
-const calculateMateriality = () => {
-  const benchmarkValue = parseFloat(materialityData.value.benchmark.value) || 0;
-  const materialityPercent = parseFloat(materialityData.value.percentages.materiality) || 0;
-  const pmlPercent = parseFloat(materialityData.value.percentages.performanceMateriality) || 0;
-  const cttPercent = parseFloat(materialityData.value.percentages.clearlyTrivial) || 0;
-
-  // Calculate Materiality
-  const materiality = benchmarkValue * (materialityPercent / 100);
-  materialityData.value.calculations.materiality = materiality;
-
-  // Calculate Performance Materiality
-  const pml = materiality * (pmlPercent / 100);
-  materialityData.value.calculations.performanceMateriality = pml;
-
-  // Calculate Clearly Trivial Threshold
-  const ctt = pml * (cttPercent / 100);
-  materialityData.value.calculations.clearlyTrivial = ctt;
-};
-
-// Update the calculateSampleSize function
-const calculateSampleSize = () => {
-  if (auditSamplingData.value.sampleSize.method === 'manual') {
-    // For manual input, directly use the input value
-    auditSamplingData.value.sampleSize.calculatedSize = 
-      parseInt(auditSamplingData.value.sampleSize.manualSize) || 0;
-  } else {
-    // For automatic calculation
-    const risk = parseFloat(auditSamplingData.value.sampleSize.automatic.auditRisk) || 0;
-    const materiality = parseFloat(auditSamplingData.value.sampleSize.automatic.materiality) || 0;
-    const confidence = parseFloat(auditSamplingData.value.sampleSize.automatic.confidenceLevel) || 0;
-    
-    // Example calculation (replace with actual formula)
-    auditSamplingData.value.sampleSize.calculatedSize = 
-      Math.ceil((confidence / (risk * materiality)) * 100);
-  }
-};
-
-// Add helper function to generate random date between two dates
-const getRandomDate = (start, end) => {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  const timeDiff = endDate.getTime() - startDate.getTime();
-  const randomTime = Math.random() * timeDiff;
-  const randomDate = new Date(startDate.getTime() + randomTime);
-  
-  // Format date as YYYY-MM-DD
-  return randomDate.toISOString().split('T')[0];
-};
-
-// Update the selectSamples function
-const selectSamples = () => {
-  const sampleSize = auditSamplingData.value.sampleSize.calculatedSize;
-  const startDate = auditSamplingData.value.population.dateRange.start;
-  const endDate = auditSamplingData.value.population.dateRange.end;
-
-  if (sampleSize <= 0) {
-    alert('Sila kira saiz sampel terlebih dahulu');
-    return;
-  }
-
-  if (!startDate || !endDate) {
-    alert('Sila pilih tempoh masa terlebih dahulu');
-    return;
-  }
-
-  // Generate samples with dates within the selected range
-  const samples = Array(sampleSize).fill(null).map((_, index) => {
-    const randomDate = getRandomDate(startDate, endDate);
-    return {
-      id: 101 + index,
-      date: randomDate,
-      type: Math.random() > 0.5 ? 'Debit' : 'Kredit',
-      accountCode: 1234 + index,
-      amount: (Math.random() * 5000).toFixed(2),
-      description: 'Pembayaran Utiliti'
-    };
-  });
-
-  // Sort samples by date
-  samples.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  auditSamplingData.value.selectedSamples = samples;
-};
 </script>
 
 <template>
@@ -705,16 +609,6 @@ const selectSamples = () => {
             <span v-if="loading" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
             <span>{{ loading ? 'Menjana...' : 'Jana Lejar' }}</span>
           </button>
-          <!-- Add View Existing Ledger button -->
-          <button 
-            v-if="selectedGroupData?.existing_ledger"
-            @click="viewExistingLedger"
-            :disabled="loading"
-            class="mt-2 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            <span v-if="loading" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-            <span>{{ loading ? 'Memuat...' : 'Lihat Lejar Sedia Ada' }}</span>
-          </button>
         </div>
       </div>
     </div>
@@ -748,9 +642,9 @@ const selectSamples = () => {
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-green-800">{{ viewingExistingLedger ? 'Lejar Sedia Ada Dimuat' : 'Lejar Berjaya Dijana' }}</h3>
+            <h3 class="text-sm font-medium text-green-800">Berjaya</h3>
             <div class="mt-2 text-sm text-green-700">
-              <p>{{ viewingExistingLedger ? 'Lejar sedia ada telah berjaya dimuat.' : 'Lejar baru telah berjaya dijana.' }}</p>
+              <p>Lejar berjaya dijana</p>
             </div>
           </div>
         </div>
