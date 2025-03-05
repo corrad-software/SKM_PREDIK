@@ -31,6 +31,18 @@ const statusCheckInterval = ref(null);
 const viewingExistingLedger = ref(false);
 const existingLedgerData = ref(null);
 
+// Add to reactive declarations at the top
+const materialityData = ref({
+  benchmark: '',
+  benchmarkValue: '',
+  materialityPercentage: '',
+  pmlPercentage: '',
+  cttPercentage: '',
+});
+
+// Add new refs for materiality calculation
+const showMaterialityResults = ref(false);
+
 // Fetch organizations from API
 const { data: organizationResponse } = await useFetch('/api/organization/list', {
   method: 'GET'
@@ -476,32 +488,35 @@ const riskAssessment = ref({
   ]
 });
 
-// Materiality Data
-const materialityData = ref({
-  overallLevel: 'MEDIUM',
-  categories: [
-    {
-      name: 'Financial Materiality',
-      level: 'HIGH',
-      description: 'Significant financial impact due to material misstatements.',
-      recommendations: [
-        'Review financial statements for accuracy.',
-        'Ensure compliance with accounting standards.'
-      ],
-      isOpen: false
-    },
-    {
-      name: 'Operational Materiality',
-      level: 'MEDIUM',
-      description: 'Moderate operational impact due to inefficiencies.',
-      recommendations: [
-        'Optimize operational processes.',
-        'Conduct regular performance reviews.'
-      ],
-      isOpen: false
-    }
-  ]
+// Add computed properties for calculations
+const calculateMateriality = computed(() => {
+  if (!materialityData.value.benchmarkValue || !materialityData.value.materialityPercentage || !showMaterialityResults.value) {
+    return '0.00';
+  }
+  const result = (materialityData.value.benchmarkValue * materialityData.value.materialityPercentage) / 100;
+  return result.toFixed(2);
 });
+
+const calculatePML = computed(() => {
+  if (!calculateMateriality.value || !materialityData.value.pmlPercentage || !showMaterialityResults.value) {
+    return '0.00';
+  }
+  const result = (parseFloat(calculateMateriality.value) * materialityData.value.pmlPercentage) / 100;
+  return result.toFixed(2);
+});
+
+const calculateCTT = computed(() => {
+  if (!calculatePML.value || !materialityData.value.cttPercentage || !showMaterialityResults.value) {
+    return '0.00';
+  }
+  const result = (parseFloat(calculatePML.value) * materialityData.value.cttPercentage) / 100;
+  return result.toFixed(2);
+});
+
+// Add function to handle materiality calculation
+const handleCalculateMateriality = () => {
+  showMaterialityResults.value = true;
+};
 
 // Audit Sampling Data
 const auditSamplingData = ref({
@@ -785,47 +800,115 @@ const viewExistingLedger = async () => {
 
           <!-- Panel Content -->
           <div class="p-4 overflow-y-auto h-full pb-20">
-            <!-- Materiality Level -->
+            <h3 class="font-medium text-gray-900 mb-4">Pemilihan Benchmark (Asas Pengiraan)</h3>
+            
+            <!-- Benchmark Selection Dropdown -->
             <div class="mb-6">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Tahap Materialiti Keseluruhan:</span>
-                <span class="px-3 py-1 rounded-full text-white font-medium text-sm bg-yellow-500">
-                  {{ materialityData.overallLevel }}
-                </span>
+              <select
+                v-model="materialityData.benchmark"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Pilih Benchmark</option>
+                <option value="jualan">Jualan</option>
+                <option value="aset">Jumlah Aset</option>
+                <option value="perbelanjaan">Perbelanjaan</option>
+              </select>
+              
+              <!-- Benchmark Notes -->
+              <div class="mt-2 text-xs text-gray-500">
+                <p>• Jualan: Untuk syarikat yang aktif</p>
+                <p>• Jumlah Aset: Jika syarikat tidak mempunyai jualan</p>
+                <p>• Perbelanjaan: Jika sesuai dengan profil syarikat</p>
               </div>
             </div>
 
-            <!-- Materiality Categories -->
-            <div class="space-y-4">
-              <div v-for="category in materialityData.categories" 
-                  :key="category.name" 
-                  class="border rounded-lg">
-                <div class="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                  <div class="flex flex-col space-y-2">
-                    <span class="font-medium">{{ category.name }}</span>
-                    <div class="flex space-x-2">
-                      <span class="px-2 py-1 rounded-full text-white text-sm bg-yellow-500">
-                        {{ category.level }}
-                      </span>
-                    </div>
-                  </div>
+            <!-- Benchmark Value -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700">
+                Nilai Benchmark (RM)
+              </label>
+              <input 
+                type="number"
+                v-model="materialityData.benchmarkValue"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="200000"
+              />
+            </div>
+
+            <!-- Materiality Percentage -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700">
+                Peratusan Materiality (%)
+              </label>
+              <input 
+                type="number"
+                v-model="materialityData.materialityPercentage"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="1.5"
+                step="0.1"
+              />
+            </div>
+
+            <!-- Performance Materiality -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700">
+                Peratusan Performance Materiality (50%-75%)
+              </label>
+              <input 
+                type="number"
+                v-model="materialityData.pmlPercentage"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="60"
+                min="50"
+                max="75"
+              />
+              <p class="text-xs text-gray-500 mt-1">Tidak boleh 100%</p>
+            </div>
+
+            <!-- Clearly Trivial Threshold -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700">
+                Peratusan Clearly Trivial Threshold (5%-10%)
+              </label>
+              <input 
+                type="number"
+                v-model="materialityData.cttPercentage"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="6"
+                min="5"
+              />
+              <p class="text-xs text-gray-500 mt-1">Boleh lebih 10%</p>
+            </div>
+
+            <!-- Results -->
+            <div class="mt-8" v-if="showMaterialityResults">
+              <h3 class="font-medium text-gray-900 mb-4">Keputusan Pengiraan</h3>
+              
+              <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600">Materiality:</span>
+                  <span class="font-medium">RM {{ calculateMateriality }}</span>
                 </div>
                 
-                <div class="p-3 border-t bg-gray-50">
-                  <p class="text-gray-600 mb-2">{{ category.description }}</p>
-                  <div class="mt-2">
-                    <h4 class="font-medium mb-1">Cadangan:</h4>
-                    <ul class="list-disc list-inside text-gray-600">
-                      <li v-for="rec in category.recommendations" 
-                          :key="rec" 
-                          class="ml-2">
-                        {{ rec }}
-                      </li>
-                    </ul>
-                  </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600">Performance Materiality:</span>
+                  <span class="font-medium">RM {{ calculatePML }}</span>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600">Clearly Trivial Threshold:</span>
+                  <span class="font-medium">RM {{ calculateCTT }}</span>
                 </div>
               </div>
             </div>
+
+            <!-- Update the Calculate Button -->
+            <button 
+              @click="handleCalculateMateriality"
+              class="mt-6 w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Kira Materiality
+            </button>
           </div>
         </div>
 
