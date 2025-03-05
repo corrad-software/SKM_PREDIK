@@ -1,7 +1,20 @@
 <script setup>
+import { createClient } from '@supabase/supabase-js'
 const { add: toast } = useToast();
-const supabase = useSupabaseClient();
-const user = useSupabaseUser();
+
+// Use runtime config instead of process.env
+const config = useRuntimeConfig();
+console.log('Runtime config:', config.public);
+
+const supabaseUrl = config.public.supabaseUrl;
+const supabaseKey = config.public.supabaseKey;
+
+console.log('Using Supabase URL from config:', supabaseUrl);
+console.log('Supabase Key exists:', !!supabaseKey);
+
+// Create Supabase client with explicit values
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const router = useRouter();
 
 // Form loading state

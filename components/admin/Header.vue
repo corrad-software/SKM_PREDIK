@@ -1,4 +1,6 @@
 <script setup>
+import { createClient } from '@supabase/supabase-js'
+
 const props = defineProps({
   isMinimized: {
     type: Boolean,
@@ -13,31 +15,48 @@ defineEmits(["toggle"]);
 
 const unreadCount = 2;
 
-// Add auth-related functionality
-const supabase = useSupabaseClient();
+// Create Supabase client directly instead of using useSupabaseClient
+const config = useRuntimeConfig();
+const supabaseUrl = config.public.supabaseUrl;
+const supabaseKey = config.public.supabaseKey;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const router = useRouter();
 const { add: toast } = useToast();
 
 // Get user information from localStorage
 const userRole = ref(localStorage.getItem('userRole') || '');
 const userName = ref('');
-const userEmail = ref('');
+const userEmail = ref(localStorage.getItem('userEmail') || '');
 
 // Set user display name based on email
 onMounted(() => {
-  const user = useSupabaseUser();
-  if (user.value) {
-    userEmail.value = user.value.email;
-    
-    // Set name based on email like in login page
-    if (userEmail.value === 'koperasi@skm.my') {
-      userName.value = 'Ahli Koperasi';
-    } else if (userEmail.value === 'auditor@skm.my') {
-      userName.value = 'Auditor SKM';
+  // Instead of useSupabaseUser, check session directly
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      userEmail.value = data.session.user.email;
+      
+      // Set name based on email like in login page
+      if (userEmail.value === 'koperasi@skm.my') {
+        userName.value = 'Ahli Koperasi';
+      } else if (userEmail.value === 'auditor@skm.my') {
+        userName.value = 'Auditor SKM';
+      } else {
+        userName.value = userEmail.value;
+      }
     } else {
-      userName.value = userEmail.value;
+      // Fallback to localStorage value if no session
+      if (userEmail.value) {
+        if (userEmail.value === 'koperasi@skm.my') {
+          userName.value = 'Ahli Koperasi';
+        } else if (userEmail.value === 'auditor@skm.my') {
+          userName.value = 'Auditor SKM';
+        } else {
+          userName.value = userEmail.value;
+        }
+      }
     }
-  }
+  });
 });
 
 // Handle logout action
@@ -46,8 +65,11 @@ const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     
-    // Clear user role from localStorage
+    // Clear user data from localStorage
     localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('authToken');
     
     toast({
       title: "Success",

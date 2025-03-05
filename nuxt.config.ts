@@ -22,7 +22,6 @@ export default defineNuxtConfig({
         },
       },
     ],
-    '@nuxtjs/supabase'
   ],
   tailwindcss: {
     cssPath: ["~/assets/css/tailwind.css", { injectPosition: 0 }],
@@ -45,10 +44,4 @@ export default defineNuxtConfig({
       supabaseKey: process.env.SUPABASE_KEY,
     },
   },
-  supabase: {
-    // Optional: Supabase specific configuration
-    // url: process.env.SUPABASE_URL,
-    // key: process.env.SUPABASE_KEY,
-    // You can also configure redirect URLs, etc.
-  }
 });
