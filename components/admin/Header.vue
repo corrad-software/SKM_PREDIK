@@ -12,6 +12,59 @@ const isRTL = computed(() => layoutStore.isRTL);
 defineEmits(["toggle"]);
 
 const unreadCount = 2;
+
+// Add auth-related functionality
+const supabase = useSupabaseClient();
+const router = useRouter();
+const { add: toast } = useToast();
+
+// Get user information from localStorage
+const userRole = ref(localStorage.getItem('userRole') || '');
+const userName = ref('');
+const userEmail = ref('');
+
+// Set user display name based on email
+onMounted(() => {
+  const user = useSupabaseUser();
+  if (user.value) {
+    userEmail.value = user.value.email;
+    
+    // Set name based on email like in login page
+    if (userEmail.value === 'koperasi@skm.my') {
+      userName.value = 'Ahli Koperasi';
+    } else if (userEmail.value === 'auditor@skm.my') {
+      userName.value = 'Auditor SKM';
+    } else {
+      userName.value = userEmail.value;
+    }
+  }
+});
+
+// Handle logout action
+const handleLogout = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
+    // Clear user role from localStorage
+    localStorage.removeItem('userRole');
+    
+    toast({
+      title: "Success",
+      description: "Logged out successfully",
+      variant: "success",
+    });
+    
+    // Redirect to login page
+    router.push('/login');
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: error.message || "Logout failed",
+      variant: "destructive",
+    });
+  }
+};
 </script>
 
 <template>
@@ -126,27 +179,14 @@ const unreadCount = 2;
               </svg>
             </div>
             <div class="flex flex-col items-start">
-              <span class="text-sm font-medium">Muhammad Said bin Ramlan</span>
-              <span class="text-xs text-muted-foreground">Super Administrator</span>
+              <span class="text-sm font-medium">{{ userName }}</span>
+              <span class="text-xs text-muted-foreground">{{ userRole }}</span>
             </div>
             <Icon name="mdi:chevron-down" class="w-4 h-4" />
           </button>
         </DropdownTrigger>
         <DropdownContent>
-          <DropdownItem>
-            <div class="flex items-center gap-2">
-              <Icon name="mdi:account" class="w-4 h-4" />
-              <span class="text-sm">Profile</span>
-            </div>
-          </DropdownItem>
-          <DropdownItem>
-            <div class="flex items-center gap-2">
-              <Icon name="mdi:cog" class="w-4 h-4" />
-              <span class="text-sm">Settings</span>
-            </div>
-          </DropdownItem>
-          <DropdownSeparator />
-          <DropdownItem>
+          <DropdownItem @click="handleLogout">
             <div class="flex items-center gap-2">
               <Icon name="mdi:logout" class="w-4 h-4" />
               <span class="text-sm">Log out</span>

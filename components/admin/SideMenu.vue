@@ -13,7 +13,29 @@ const props = defineProps({
 const emit = defineEmits(["toggle"]);
 const layoutStore = useLayoutStore();
 const { getAdminNavigation } = useNavigation();
-const menuItems = getAdminNavigation();
+const menuItems = ref([]);
+
+// Get user role from localStorage
+const userRole = ref('');
+
+onMounted(() => {
+  if (process.client) {
+    userRole.value = localStorage.getItem('userRole') || '';
+    
+    // Filter menu items based on user role
+    const allMenuItems = getAdminNavigation();
+    
+    if (userRole.value === 'ahli-kooperasi') {
+      menuItems.value = allMenuItems.filter(section => section.title === 'Ahli Koperasi');
+    } else if (userRole.value === 'auditor-skm') {
+      menuItems.value = allMenuItems.filter(section => section.title === 'Auditor SKM');
+    } else {
+      menuItems.value = allMenuItems; // Fallback to showing all items
+    }
+    
+    initializeExpandedItems();
+  }
+});
 
 // Initialize expanded items based on current route
 const initializeExpandedItems = () => {
@@ -49,7 +71,7 @@ const initializeExpandedItems = () => {
     return items.some(item => item.path === currentPath);
   };
 
-  menuItems.forEach(section => {
+  menuItems.value.forEach(section => {
     checkAndExpandParents(section.items);
   });
 };
@@ -204,7 +226,7 @@ const dropdownPosition = computed(() => {
           <img
             src="\assets\image\skm-logo.png"
             alt="Logo"
-            class="w-12 h-8 rounded-md"
+            class="w-8 h-8 rounded-md"
           />
           <div
             class="overflow-hidden transition-all duration-200"
