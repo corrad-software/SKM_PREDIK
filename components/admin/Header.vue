@@ -1,4 +1,6 @@
 <script setup>
+import { createClient } from '@supabase/supabase-js'
+
 const props = defineProps({
   isMinimized: {
     type: Boolean,
@@ -12,6 +14,79 @@ const isRTL = computed(() => layoutStore.isRTL);
 defineEmits(["toggle"]);
 
 const unreadCount = 2;
+
+// Create Supabase client directly instead of using useSupabaseClient
+const config = useRuntimeConfig();
+const supabaseUrl = config.public.supabaseUrl;
+const supabaseKey = config.public.supabaseKey;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const router = useRouter();
+const { add: toast } = useToast();
+
+// Get user information from localStorage
+const userRole = ref(localStorage.getItem('userRole') || '');
+const userName = ref('');
+const userEmail = ref(localStorage.getItem('userEmail') || '');
+
+// Set user display name based on email
+onMounted(() => {
+  // Instead of useSupabaseUser, check session directly
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      userEmail.value = data.session.user.email;
+      
+      // Set name based on email like in login page
+      if (userEmail.value === 'koperasi@skm.my') {
+        userName.value = 'Ahli Koperasi';
+      } else if (userEmail.value === 'auditor@skm.my') {
+        userName.value = 'Auditor SKM';
+      } else {
+        userName.value = userEmail.value;
+      }
+    } else {
+      // Fallback to localStorage value if no session
+      if (userEmail.value) {
+        if (userEmail.value === 'koperasi@skm.my') {
+          userName.value = 'Ahli Koperasi';
+        } else if (userEmail.value === 'auditor@skm.my') {
+          userName.value = 'Auditor SKM';
+        } else {
+          userName.value = userEmail.value;
+        }
+      }
+    }
+  });
+});
+
+// Handle logout action
+const handleLogout = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
+    // Clear user data from localStorage
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('authToken');
+    
+    toast({
+      title: "Success",
+      description: "Logged out successfully",
+      variant: "success",
+    });
+    
+    // Redirect to login page
+    router.push('/login');
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: error.message || "Logout failed",
+      variant: "destructive",
+    });
+  }
+};
 </script>
 
 <template>
@@ -126,27 +201,14 @@ const unreadCount = 2;
               </svg>
             </div>
             <div class="flex flex-col items-start">
-              <span class="text-sm font-medium">Muhammad Said bin Ramlan</span>
-              <span class="text-xs text-muted-foreground">Super Administrator</span>
+              <span class="text-sm font-medium">{{ userName }}</span>
+              <span class="text-xs text-muted-foreground">{{ userRole }}</span>
             </div>
             <Icon name="mdi:chevron-down" class="w-4 h-4" />
           </button>
         </DropdownTrigger>
         <DropdownContent>
-          <DropdownItem>
-            <div class="flex items-center gap-2">
-              <Icon name="mdi:account" class="w-4 h-4" />
-              <span class="text-sm">Profile</span>
-            </div>
-          </DropdownItem>
-          <DropdownItem>
-            <div class="flex items-center gap-2">
-              <Icon name="mdi:cog" class="w-4 h-4" />
-              <span class="text-sm">Settings</span>
-            </div>
-          </DropdownItem>
-          <DropdownSeparator />
-          <DropdownItem>
+          <DropdownItem @click="handleLogout">
             <div class="flex items-center gap-2">
               <Icon name="mdi:logout" class="w-4 h-4" />
               <span class="text-sm">Log out</span>

@@ -1,20 +1,72 @@
 <script setup>
+import { createClient } from '@supabase/supabase-js'
 const { add: toast } = useToast();
+
+// Use runtime config instead of process.env
+const config = useRuntimeConfig();
+console.log('Runtime config:', config.public);
+
+const supabaseUrl = config.public.supabaseUrl;
+const supabaseKey = config.public.supabaseKey;
+
+console.log('Using Supabase URL from config:', supabaseUrl);
+console.log('Supabase Key exists:', !!supabaseKey);
+
+// Create Supabase client with explicit values
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const router = useRouter();
+
+// Form loading state
+const isLoading = ref(false);
 
 const handleLogin = async (formData) => {
   try {
-    navigateTo("/ahli-kooperasi/upload");
-    // toast({
-    //   title: "Success",
-    //   description: "Login successful",
-    //   variant: "success",
-    // });
+    isLoading.value = true;
+    
+    // Sign in with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
+
+    if (error) throw error;
+    
+    // Get user role based on email
+    let redirectPath = '';
+    let userRole = '';
+    
+    if (formData.email === 'koperasi@skm.my') {
+      redirectPath = '/ahli-kooperasi/entity-management';
+      userRole = 'ahli-kooperasi';
+    } else if (formData.email === 'auditor@skm.my') {
+      redirectPath = '/auditor-skm/entity-management';
+      userRole = 'auditor-skm';
+    } else {
+      // Default fallback - you might want to handle this differently
+      redirectPath = '/ahli-kooperasi/upload';
+      userRole = 'ahli-kooperasi';
+    }
+    
+    // Store user role in localStorage for navigation filtering
+    localStorage.setItem('userRole', userRole);
+    
+    toast({
+      title: "Success",
+      description: "Login successful",
+      variant: "success",
+    });
+    
+    // Navigate to the appropriate page based on role
+    navigateTo(redirectPath);
   } catch (error) {
     toast({
       title: "Error",
       description: error.message || "Login failed",
       variant: "destructive",
     });
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
@@ -27,20 +79,15 @@ const handleLogin = async (formData) => {
     >
       <!-- Logo section -->
       <div class="flex items-center gap-2 text-base">
-        <div class="p-0.5">⌘</div>
-        Corrad
+        <img
+            src="\assets\image\skm-logo.png"
+            alt="Logo"
+            class="w-8 h-8 rounded-md"
+          />
+        PREDIK SKM
       </div>
 
-      <!-- Testimonial section - positioned at bottom -->
-      <div class="mt-auto">
-        <blockquote
-          class="text-xl lg:text-2xl font-medium leading-relaxed mb-3"
-        >
-          "This library has saved me countless hours of work and helped me
-          deliver stunning designs to my clients faster than ever before."
-        </blockquote>
-        <p class="text-sm text-muted-foreground">Sofia Davis</p>
-      </div>
+
     </div>
 
     <!-- Right side - Login form -->
@@ -68,10 +115,11 @@ const handleLogin = async (formData) => {
           @submit="handleLogin"
         >
           <FormKit
-            type="text"
+            type="email"
             name="email"
             placeholder="name@example.com"
             label="Email"
+            validation="required|email"
           />
 
           <FormKit
@@ -79,6 +127,7 @@ const handleLogin = async (formData) => {
             name="password"
             placeholder="Enter your password"
             label="Password"
+            validation="required"
           />
 
           <div class="flex items-start justify-between">
@@ -94,31 +143,12 @@ const handleLogin = async (formData) => {
           <Button
             type="submit"
             class="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-9"
+            :disabled="isLoading"
           >
-            Sign In
+            <span v-if="isLoading">Signing in...</span>
+            <span v-else>Sign In</span>
           </Button>
 
-          <div class="relative my-6">
-            <div class="absolute inset-0 flex items-center">
-              <span class="w-full border-t"></span>
-            </div>
-            <div class="relative flex justify-center text-xs uppercase">
-              <span class="bg-card px-2 text-muted-foreground"
-                >Or continue with</span
-              >
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <Button variant="outline" class="w-full h-9" type="button">
-              <Icon name="mdi:google" class="mr-2 h-4 w-4" />
-              Google
-            </Button>
-            <Button variant="outline" class="w-full h-9" type="button">
-              <Icon name="mdi:github" class="mr-2 h-4 w-4" />
-              GitHub
-            </Button>
-          </div>
         </FormKit>
 
         <!-- Terms text -->
