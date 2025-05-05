@@ -8,7 +8,7 @@ export default defineNuxtPlugin({
     const currentTheme =
       localStorage.getItem("theme") ||
       (window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
+        ? "default"
         : "default");
 
     setTheme(currentTheme);

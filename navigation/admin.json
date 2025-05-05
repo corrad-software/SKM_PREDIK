@@ -8,26 +8,22 @@
         {
           "name": "Pengurusan Entiti",
           "icon": "hugeicons:structure-05",
-          "path": "/ahli-kooperasi/entity-management",
-          "roles": ["admin", "ahli-kooperasi"]
+          "path": "/ahli-kooperasi/entity-management"
         },
         {
           "name": "Muat Naik & Semakan",
           "icon": "ic:sharp-upload-file",
-          "path": "/ahli-kooperasi/upload",
-          "roles": ["admin", "ahli-kooperasi"]
+          "path": "/ahli-kooperasi/upload"
         },
         {
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
-          "path": "/ahli-kooperasi/index-review",
-          "roles": ["admin", "ahli-kooperasi"]
+          "path": "/ahli-kooperasi/index-review"
         },
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
-          "path": "/ahli-kooperasi/ledger-review",
-          "roles": ["admin", "ahli-kooperasi"]
+          "path": "/ahli-kooperasi/ledger-review"
         }
       ]
     },
@@ -39,20 +35,17 @@
         {
           "name": "Senarai Koperasi",
           "icon": "material-symbols:list-rounded",
-          "path": "/auditor-skm/entity-management",
-          "roles": ["admin", "auditor-skm"]
+          "path": "/auditor-skm/entity-management"
         },
         {
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
-          "path": "/auditor-skm/index-review",
-          "roles": ["admin", "auditor-skm"]
+          "path": "/auditor-skm/index-review"
         },
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
-          "path": "/auditor-skm/ledger-review",
-          "roles": ["admin", "auditor-skm"]
+          "path": "/auditor-skm/ledger-review"
         }
       ]
     }

@@ -29,21 +29,20 @@ onMounted(() => {
       menuItems.value = allMenuItems; // Admin sees everything
     } else if (userRole.value === 'ahli-kooperasi') {
       menuItems.value = allMenuItems
-        .filter(section => section.title === 'Ahli Koperasi')
+        .filter(section => section.roles.includes('ahli-kooperasi'))
         .map(section => ({
           ...section,
-          items: section.items.filter(item => 
-            ['Pengurusan Entiti', 'Muat Naik & Semakan'].includes(item.name)
-          )
+          items: section.items // Keep all items in allowed sections
         }))
         .filter(section => section.items.length > 0);
     } else if (userRole.value === 'auditor-skm') {
       menuItems.value = allMenuItems
-        .filter(section => section.title === 'Auditor SKM')
+        .filter(section => section.roles.includes('auditor-skm'))
         .map(section => ({
           ...section,
-          items: section.items
-        }));
+          items: section.items // Keep all items in allowed sections
+        }))
+        .filter(section => section.items.length > 0);
     } else {
       menuItems.value = []; // No role means no access
     }
