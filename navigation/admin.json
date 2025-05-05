@@ -21,13 +21,13 @@
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
           "path": "/ahli-kooperasi/index-review",
-          "roles": ["admin"]
+          "roles": ["admin", "ahli-kooperasi"]
         },
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
           "path": "/ahli-kooperasi/ledger-review",
-          "roles": ["admin"]
+          "roles": ["admin", "ahli-kooperasi"]
         }
       ]
     },
