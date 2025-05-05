@@ -45,7 +45,7 @@ const handleLogin = async (formData) => {
     } else {
       // Default fallback - you might want to handle this differently
       redirectPath = '/ahli-kooperasi/upload';
-      userRole = 'ahli-kooperasi';
+      userRole = 'admin';
     }
     
     // Store user role in localStorage for navigation filtering

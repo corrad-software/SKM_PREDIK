@@ -189,7 +189,6 @@ const documentSections = ref([
       { name: 'Jurnal Pelarasan Audit (JPA)', icon: 'ic:round-edit-note', path: '/jpa', disabled: true },
       { name: 'Laporan Juruaudit', icon: 'ic:round-assessment', path: '/laporan-juruaudit', disabled: true },
       { name: 'Laporan Pengurusan', icon: 'ic:round-manage-accounts', path: '/laporan-pengurusan', disabled: true },
-      { name: 'Kuiri', icon: 'ic:round-help', path: '/kuiri', disabled: true },
       { name: 'Surat-Surat Pengesahan', icon: 'ic:round-mark-email-read', path: '/surat-pengesahan', disabled: true },
       { name: 'Dokumen ISO', icon: 'ic:round-verified', path: '/dokumen-iso', disabled: true },
       { name: 'Lain-Lain', icon: 'ic:round-more-horiz', path: '/lain-lain', disabled: true },

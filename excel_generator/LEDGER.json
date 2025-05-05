@@ -1,0 +1,316 @@
+{
+  "ledger": {
+    "title": "Syarikat A",
+    "subtitle": "PENYATA KEWANGAN : 31 DISEMBER 2025",
+    "columns": [
+      { "name": "AKAUN 2026", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "DRAF 2025", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "PELARASAN", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "IMBANGAN DUGA", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "AKAUN PERNIAGAAN", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "AK UI BUDI", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "AK PEMBAHAGIAN", "subColumns": ["DEBIT RM", "KREDIT RM"] },
+      { "name": "KUNCI KIRA-KIRA", "subColumns": ["DEBIT RM", "KREDIT RM"] }
+    ],
+    "sections": [
+      {
+        "name": "Aset",
+        "groups": [
+          {
+            "name": "Aset Semasa",
+            "code": "10000",
+            "type": "header",
+            "items": [
+              {
+                "code": "10010",
+                "name": "Tunai dan Bank",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "50000", "kredit": "" },
+                  "DRAF 2025": { "debit": "54405", "kredit": "" }
+                }
+              },
+              {
+                "code": "10020",
+                "name": "Penghutang",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "30000", "kredit": "" },
+                  "DRAF 2025": { "debit": "33649", "kredit": "" }
+                }
+              },
+              {
+                "code": "10030",
+                "name": "Inventori",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "20000", "kredit": "" },
+                  "DRAF 2025": { "debit": "22455", "kredit": "" }
+                }
+              },
+              {
+                "code": "10040",
+                "name": "Jumlah Aset Semasa",
+                "type": "total",
+                "values": {
+                  "AKAUN 2026": { "debit": "100000", "kredit": "" },
+                  "DRAF 2025": { "debit": "110154", "kredit": "" }
+                }
+              }
+            ]
+          },
+          {
+            "name": "Aset Bukan Semasa",
+            "code": "10050",
+            "type": "header",
+            "items": [
+              {
+                "code": "10060",
+                "name": "Hartanah, Loji & Peralatan",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "200000", "kredit": "" },
+                  "DRAF 2025": { "debit": "226810", "kredit": "" }
+                }
+              },
+              {
+                "code": "10070",
+                "name": "Pelaburan Jangka Panjang",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "50000", "kredit": "" },
+                  "DRAF 2025": { "debit": "55146", "kredit": "" }
+                }
+              },
+              {
+                "code": "10080",
+                "name": "Jumlah Aset Bukan Semasa",
+                "type": "total",
+                "values": {
+                  "AKAUN 2026": { "debit": "250000", "kredit": "" },
+                  "DRAF 2025": { "debit": "288320", "kredit": "" }
+                }
+              }
+            ]
+          },
+          {
+            "code": "10090",
+            "name": "Jumlah Aset",
+            "type": "grandTotal",
+            "values": {
+              "AKAUN 2026": { "debit": "350000", "kredit": "" },
+              "DRAF 2025": { "debit": "399285", "kredit": "" }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Liabiliti dan Ekuiti",
+        "groups": [
+          {
+            "name": "Liabiliti Semasa",
+            "code": "10100",
+            "type": "header",
+            "items": [
+              {
+                "code": "10110",
+                "name": "Pemiutang",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "20000" },
+                  "DRAF 2025": { "debit": "", "kredit": "23386" }
+                }
+              },
+              {
+                "code": "10120",
+                "name": "Pinjaman Jangka Pendek",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "30000" },
+                  "DRAF 2025": { "debit": "", "kredit": "31568" }
+                }
+              },
+              {
+                "code": "10130",
+                "name": "Jumlah Liabiliti Semasa",
+                "type": "total",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "50000" },
+                  "DRAF 2025": { "debit": "", "kredit": "59646" }
+                }
+              }
+            ]
+          },
+          {
+            "name": "Liabiliti Bukan Semasa",
+            "code": "10140",
+            "type": "header",
+            "items": [
+              {
+                "code": "10150",
+                "name": "Pinjaman Jangka Panjang",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "100000" },
+                  "DRAF 2025": { "debit": "", "kredit": "108426" }
+                }
+              },
+              {
+                "code": "10160",
+                "name": "Jumlah Liabiliti Bukan Semasa",
+                "type": "total",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "100000" },
+                  "DRAF 2025": { "debit": "", "kredit": "119786" }
+                }
+              }
+            ]
+          },
+          {
+            "code": "10170",
+            "name": "Jumlah Liabiliti",
+            "type": "grandTotal",
+            "values": {
+              "AKAUN 2026": { "debit": "", "kredit": "150000" },
+              "DRAF 2025": { "debit": "", "kredit": "160069" }
+            }
+          },
+          {
+            "name": "Ekuiti",
+            "code": "10180",
+            "type": "header",
+            "items": [
+              {
+                "code": "10190",
+                "name": "Modal Saham",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "120000" },
+                  "DRAF 2025": { "debit": "", "kredit": "137497" }
+                }
+              },
+              {
+                "code": "10200",
+                "name": "Rizab",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "50000" },
+                  "DRAF 2025": { "debit": "", "kredit": "54912" }
+                }
+              },
+              {
+                "code": "10210",
+                "name": "Lebihan / (Defisit)",
+                "type": "item",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "30000" },
+                  "DRAF 2025": { "debit": "", "kredit": "32153" }
+                }
+              },
+              {
+                "code": "10220",
+                "name": "Jumlah Ekuiti",
+                "type": "total",
+                "values": {
+                  "AKAUN 2026": { "debit": "", "kredit": "200000" },
+                  "DRAF 2025": { "debit": "", "kredit": "219168" }
+                }
+              }
+            ]
+          },
+          {
+            "code": "10230",
+            "name": "Jumlah Liabiliti dan Ekuiti",
+            "type": "grandTotal",
+            "values": {
+              "AKAUN 2026": { "debit": "", "kredit": "350000" },
+              "DRAF 2025": { "debit": "", "kredit": "395309" }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "materiality": {
+    "categories": [
+      {
+        "name": "Materialiti Kewangan",
+        "level": "MEDIUM",
+        "isOpen": false,
+        "description": "Materialiti berkaitan dengan ketepatan laporan kewangan.",
+        "recommendations": [
+          "Audit dalaman berkala",
+          "Penggunaan perisian perakaunan yang tepat"
+        ]
+      },
+      {
+        "name": "Materialiti Operasi",
+        "level": "LOW",
+        "isOpen": false,
+        "description": "Materialiti berkaitan dengan kecekapan operasi syarikat.",
+        "recommendations": ["Penilaian proses operasi", "Pengoptimuman sumber"]
+      }
+    ],
+    "overallLevel": "MEDIUM"
+  },
+  "auditSampling": {
+    "categories": [
+      {
+        "name": "Persampelan Rawak",
+        "level": "LOW",
+        "isOpen": false,
+        "description": "Persampelan untuk menguji ketepatan transaksi rawak.",
+        "recommendations": [
+          "Gunakan perisian persampelan",
+          "Latihan untuk auditor"
+        ]
+      },
+      {
+        "name": "Persampelan Sistematik",
+        "level": "MEDIUM",
+        "isOpen": false,
+        "description": "Persampelan untuk menguji transaksi berdasarkan pola tertentu.",
+        "recommendations": ["Kaji pola transaksi", "Audit berkala"]
+      }
+    ],
+    "overallLevel": "LOW"
+  },
+  "riskAssessment": {
+    "categories": [
+      {
+        "name": "Risiko Kewangan",
+        "level": "MEDIUM",
+        "isOpen": false,
+        "status": "MONITORING",
+        "description": "Risiko berkaitan dengan pengurusan aliran tunai dan hutang.",
+        "recommendations": [
+          "Tingkatkan pengurusan aliran tunai",
+          "Kurangkan hutang jangka pendek"
+        ]
+      },
+      {
+        "name": "Risiko Pasaran",
+        "level": "HIGH",
+        "isOpen": false,
+        "status": "NEED ATTENTION",
+        "description": "Risiko berkaitan dengan perubahan pasaran yang boleh menjejaskan keuntungan.",
+        "recommendations": [
+          "Diversifikasi produk",
+          "Pantau perubahan pasaran secara berkala"
+        ]
+      },
+      {
+        "name": "Risiko Operasi",
+        "level": "LOW",
+        "isOpen": false,
+        "status": "ACCEPTABLE",
+        "description": "Risiko berkaitan dengan operasi harian syarikat.",
+        "recommendations": [
+          "Automasi proses operasi",
+          "Latihan pekerja secara berkala"
+        ]
+      }
+    ],
+    "overallRisk": "MEDIUM"
+  }
+}

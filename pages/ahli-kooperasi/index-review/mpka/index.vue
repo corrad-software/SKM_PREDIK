@@ -293,7 +293,9 @@ const adjustTextareaHeight = (event) => {
         class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center"
         title="Kembali ke halaman sebelumnya"
       >
-        <span class="mr-1">←</span> Kembali
+        <NuxtLink to="/ahli-kooperasi/index-review/kertas-kerja">
+          <span class="mr-1">←</span> Kembali
+        </NuxtLink>
       </button>
       <button 
         class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"

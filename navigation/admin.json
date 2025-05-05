@@ -3,47 +3,56 @@
     {
       "type": "section",
       "title": "Ahli Koperasi",
+      "roles": ["admin", "ahli-kooperasi"],
       "items": [
         {
           "name": "Pengurusan Entiti",
           "icon": "hugeicons:structure-05",
-          "path": "/ahli-kooperasi/entity-management"
+          "path": "/ahli-kooperasi/entity-management",
+          "roles": ["admin", "ahli-kooperasi"]
         },
         {
           "name": "Muat Naik & Semakan",
           "icon": "ic:sharp-upload-file",
-          "path": "/ahli-kooperasi/upload"
+          "path": "/ahli-kooperasi/upload",
+          "roles": ["admin", "ahli-kooperasi"]
         },
         {
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
-          "path": "/ahli-kooperasi/index-review"
+          "path": "/ahli-kooperasi/index-review",
+          "roles": ["admin"]
         },
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
-          "path": "/ahli-kooperasi/ledger-review"
+          "path": "/ahli-kooperasi/ledger-review",
+          "roles": ["admin"]
         }
       ]
     },
     {
       "type": "section",
       "title": "Auditor SKM",
+      "roles": ["admin", "auditor-skm"],
       "items": [
         {
           "name": "Senarai Koperasi",
           "icon": "material-symbols:list-rounded",
-          "path": "/auditor-skm/entity-management"
+          "path": "/auditor-skm/entity-management",
+          "roles": ["admin", "auditor-skm"]
         },
         {
           "name": "Paparan Indeks",
           "icon": "ant-design:node-index-outlined",
-          "path": "/auditor-skm/index-review"
+          "path": "/auditor-skm/index-review",
+          "roles": ["admin", "auditor-skm"]
         },
         {
           "name": "Paparan Lejar",
           "icon": "fluent-emoji-high-contrast:ledger",
-          "path": "/auditor-skm/ledger-review"
+          "path": "/auditor-skm/ledger-review",
+          "roles": ["admin", "auditor-skm"]
         }
       ]
     }

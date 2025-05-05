@@ -25,12 +25,27 @@ onMounted(() => {
     // Filter menu items based on user role
     const allMenuItems = getAdminNavigation();
     
-    if (userRole.value === 'ahli-kooperasi') {
-      menuItems.value = allMenuItems.filter(section => section.title === 'Ahli Koperasi');
+    if (userRole.value === 'admin') {
+      menuItems.value = allMenuItems; // Admin sees everything
+    } else if (userRole.value === 'ahli-kooperasi') {
+      menuItems.value = allMenuItems
+        .filter(section => section.title === 'Ahli Koperasi')
+        .map(section => ({
+          ...section,
+          items: section.items.filter(item => 
+            ['Pengurusan Entiti', 'Muat Naik & Semakan'].includes(item.name)
+          )
+        }))
+        .filter(section => section.items.length > 0);
     } else if (userRole.value === 'auditor-skm') {
-      menuItems.value = allMenuItems.filter(section => section.title === 'Auditor SKM');
+      menuItems.value = allMenuItems
+        .filter(section => section.title === 'Auditor SKM')
+        .map(section => ({
+          ...section,
+          items: section.items
+        }));
     } else {
-      menuItems.value = allMenuItems; // Fallback to showing all items
+      menuItems.value = []; // No role means no access
     }
     
     initializeExpandedItems();

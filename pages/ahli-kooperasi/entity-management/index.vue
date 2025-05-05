@@ -90,37 +90,25 @@
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div v-for="docType in documentTypes" :key="docType.id" 
-                 class="bg-gray-50 p-3 rounded-lg">
+                 class="bg-gray-50/50 p-3 rounded-md border border-gray-100">
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center">
                   <input 
                     type="checkbox" 
                     :checked="parentCompany.uploadedDocuments[docType.id]"
-                    class="h-4 w-4 text-blue-500 rounded border-gray-300 mr-2"
+                    class="h-3.5 w-3.5 text-blue-500 rounded border-gray-300 mr-2"
                     disabled
                   />
-                  <span class="text-sm font-medium text-gray-700">{{ docType.name }}</span>
+                  <span class="text-xs font-medium text-gray-700">{{ docType.name }}</span>
                 </div>
               </div>
-              
               <div class="flex items-center justify-between">
-                <!-- If file is uploaded -->
-                <div v-if="parentCompany.uploadedDocuments[docType.id]" 
-                     class="flex items-center">
-                  <span class="text-xs text-gray-500">
-                    {{ parentCompany.files.find(f => f.statement_type === docType.id)?.file_name }}
-                  </span>
+                <div v-if="parentCompany.uploadedDocuments[docType.id]" class="text-xs text-gray-500 truncate max-w-[120px]">
+                  {{ parentCompany.files.find(f => f.statement_type === docType.id)?.file_name }}
                 </div>
-                
-                <!-- If no file uploaded -->
-                <button 
-                  v-else
-                  @click="navigateToUpload(docType.id)" 
-                  class="w-28 h-8 flex items-center justify-center px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-all"
-                >
-                  <Icon name="material-symbols:upload" class="w-3 h-3 mr-1" />
-                  Muat Naik
-                </button>
+                <div v-else class="text-xs text-gray-400 italic">
+                  Sila ke Menu Muat Naik & Semakan untuk kemaskini
+                </div>
               </div>
             </div>
           </div>
@@ -166,26 +154,26 @@
         <div class="hidden md:block overflow-x-auto">
           <table class="w-full">
             <thead>
-              <tr class="border-b border-gray-100">
-                <th class="px-8 py-4 text-left text-sm font-medium text-gray-600">
+              <tr class="bg-gray-50">
+                <th class="px-6 py-4 text-left text-sm font-medium text-gray-600 border-b border-gray-200">
                   <span class="flex items-center">
                     <Icon name="mdi:office-building" class="w-4 h-4 mr-2" />
                     Nama Syarikat
                   </span>
                 </th>
-                <th class="px-8 py-4 text-left text-sm font-medium text-gray-600">
+                <th class="px-6 py-4 text-left text-sm font-medium text-gray-600 border-b border-gray-200">
                   <span class="flex items-center">
                     <Icon name="material-symbols:credit-card" class="w-4 h-4 mr-2" />
                     Akaun Bank
                   </span>
                 </th>
-                <th class="px-8 py-4 text-left text-sm font-medium text-gray-600">
+                <th class="px-6 py-4 text-left text-sm font-medium text-gray-600 border-b border-gray-200">
                   <span class="flex items-center">
                     <Icon name="material-symbols:description" class="w-4 h-4 mr-2" />
                     Dokumen Diperlukan
                   </span>
                 </th>
-                <th class="px-8 py-4 text-left text-sm font-medium text-gray-600">
+                <th class="px-6 py-4 text-left text-sm font-medium text-gray-600 border-b border-gray-200">
                   <span class="flex items-center">
                     <Icon name="material-symbols:settings-rounded" class="w-4 h-4 mr-2" />
                     Tindakan
@@ -195,79 +183,79 @@
             </thead>
             <tbody>
               <tr v-for="(subsidiary, index) in subsidiaries" :key="index" 
-                  class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td class="px-8 py-4">
+                  class="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4">
                   <input 
                     v-model="subsidiary.name" 
                     type="text" 
-                    class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" 
+                    class="w-full px-3 py-2 rounded-md border border-gray-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-all text-sm" 
                     placeholder="Masukkan nama syarikat"
                   />
                 </td>
-                <td class="px-8 py-4">
+                <td class="px-6 py-4">
                   <input 
                     v-model="subsidiary.bankAccount" 
                     type="text" 
-                    class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" 
+                    class="w-full px-3 py-2 rounded-md border border-gray-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-all text-sm" 
                     placeholder="Masukkan nombor akaun"
                   />
                 </td>
-                <td class="px-8 py-4">
-                  <div class="grid grid-cols-2 gap-3">
+                <td class="px-6 py-4">
+                  <div class="grid grid-cols-2 gap-2">
                     <div v-for="docType in documentTypes" :key="docType.id" 
-                         class="bg-gray-50 rounded-lg p-3">
-                      <div class="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          :checked="subsidiary.uploadedDocuments[docType.id]"
-                          disabled
-                          class="w-4 h-4 mr-2"
-                        />
-                        <span class="text-sm font-medium">{{ docType.name }}</span>
+                         class="bg-gray-50/50 rounded-md p-2 border border-gray-100">
+                      <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex items-center">
+                          <input
+                            type="checkbox"
+                            :checked="subsidiary.uploadedDocuments[docType.id]"
+                            disabled
+                            class="w-3.5 h-3.5 mr-2 rounded border-gray-300 text-blue-500"
+                          />
+                          <span class="text-xs font-medium text-gray-700">{{ docType.name }}</span>
+                        </div>
                       </div>
                       <div class="flex items-center justify-between">
-                        <div v-if="subsidiary.uploadedDocuments[docType.id]" class="text-xs text-gray-600">
+                        <div v-if="subsidiary.uploadedDocuments[docType.id]" 
+                             class="text-xs text-gray-500 truncate max-w-[120px]">
                           {{ subsidiary.files.find(f => f.statement_type === docType.id)?.file_name }}
                         </div>
-                        <button 
-                          @click="navigateToUpload(docType.id, true, index)"
-                          class="w-28 h-8 flex items-center justify-center px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-all"
-                          :class="{ 'opacity-50 cursor-not-allowed': !subsidiary.id }"
-                          :disabled="!subsidiary.id"
-                        >
-                          <Icon name="material-symbols:upload" class="w-3 h-3 mr-1" />
-                          {{ subsidiary.id ? 'Muat Naik' : 'Simpan' }}
-                        </button>
+                        <div v-else-if="subsidiary.id" class="text-xs text-gray-400 italic">
+                          Sila ke Menu Muat Naik & Semakan
+                        </div>
+                        <div v-else class="text-xs text-gray-400">
+                          Simpan dahulu sebelum muat naik
+                        </div>
                       </div>
                     </div>
                   </div>
                 </td>
-                <td class="px-8 py-4">
-                  <div class="flex items-center space-x-2">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
                     <button 
                       @click="saveSubsidiary(subsidiary, index)"
-                      class="text-blue-500 hover:text-blue-600 flex items-center px-4 py-2 rounded-lg hover:bg-blue-50 transition-all"
+                      class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
                       :disabled="!subsidiary.name"
                     >
-                      <Icon name="material-symbols:save" class="w-4 h-4 mr-2" />
+                      <Icon name="material-symbols:save" class="w-3.5 h-3.5 mr-1.5" />
                       Simpan
                     </button>
                     <button 
                       @click="removeSubsidiary(index)" 
-                      class="text-red-500 hover:text-red-600 flex items-center px-4 py-2 rounded-lg hover:bg-red-50 transition-all"
+                      class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
                     >
-                      <Icon name="delete" class="w-4 h-4 mr-2" />
+                      <Icon name="delete" class="w-3.5 h-3.5 mr-1.5" />
                       Buang
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="subsidiaries.length === 0">
-                <td colspan="4" class="px-8 py-12 text-center text-gray-500">
+                <td colspan="4" class="px-6 py-10 text-center text-gray-500">
                   <div class="flex flex-col items-center">
                     <Icon name="add" class="w-8 h-8 mb-3 text-gray-400" />
-                    <p>Tiada anak syarikat ditambah lagi.</p>
-                    <p class="text-sm">Klik "Tambah Anak Syarikat" untuk memulakan.</p>
+                    <p class="text-sm">Tiada anak syarikat ditambah lagi.</p>
+                    <p class="text-xs text-gray-400 mt-1">Klik "Tambah Anak Syarikat" untuk memulakan.</p>
                   </div>
                 </td>
               </tr>

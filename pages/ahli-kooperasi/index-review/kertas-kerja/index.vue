@@ -286,15 +286,9 @@ const buttons = [
     action: () => router.push('/auditor-skm/index-review/mpka')
   },
   { 
-    label: 'JPA', 
-    action: () => router.push('/auditor-skm/index-review/jpa')
-  },
-  { 
     label: 'KUIRI', 
     action: () => showKuiriPopup.value = true 
-  },
-  { label: 'SIMPAN', action: () => {} },
-  { label: 'SALIN', action: () => {} },
+  }
 ];
 </script>
 
@@ -552,6 +546,16 @@ const buttons = [
           </div>
         </div>
       </div>
+    </div>
+
+
+    <div class="flex justify-end">
+      <button
+        class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"
+        title="Simpan maklumat"
+      >
+        <span class="mr-1">💾</span> Simpan
+      </button>
     </div>
 
     <!-- Add the Kuiri popup just before the closing </div> of the main container -->

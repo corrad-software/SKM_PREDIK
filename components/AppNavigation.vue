@@ -7,22 +7,49 @@ onMounted(() => {
   // Get user role from localStorage
   userRole.value = localStorage.getItem('userRole') || '';
   console.log('Current user role:', userRole.value); // For debugging
+  console.log('Original menu:', adminMenu.menu); // Log original menu structure
 });
 
 const filteredMenu = computed(() => {
-  if (!userRole.value) return adminMenu.menu; // Show all if no role (you might want to change this)
+  console.log('Computing filtered menu for role:', userRole.value);
   
-  // Filter sections based on user role
-  return adminMenu.menu.filter(section => {
-    if (userRole.value === 'ahli-kooperasi' && section.title === 'Ahli Koperasi') {
-      return true;
-    }
-    if (userRole.value === 'auditor-skm' && section.title === 'Auditor SKM') {
-      return true;
-    }
-    return false;
-  });
+  if (!userRole.value) {
+    console.log('No user role found, returning empty array');
+    return [];
+  }
+  
+  // Filter sections and their items based on user role
+  const result = adminMenu.menu
+    .map(section => {
+      console.log('Processing section:', section.title);
+      
+      // Filter items within the section based on user role
+      const filteredItems = section.items.filter(item => {
+        console.log('Checking item:', item.name, 'roles:', item.roles, 'includes user role:', item.roles?.includes(userRole.value));
+        return item.roles?.includes(userRole.value);
+      });
+      
+      console.log('Filtered items for section:', section.title, filteredItems);
+      
+      // Return section with filtered items if there are any visible items
+      if (filteredItems.length > 0) {
+        return {
+          ...section,
+          items: filteredItems
+        };
+      }
+      return null;
+    })
+    .filter(section => section !== null);
+    
+  console.log('Final filtered menu:', result);
+  return result;
 });
+
+// Watch for changes in the filtered menu
+watch(filteredMenu, (newMenu) => {
+  console.log('Filtered menu updated:', newMenu);
+}, { immediate: true });
 </script>
 
 <template>

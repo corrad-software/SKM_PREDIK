@@ -91,7 +91,7 @@ const handleLogout = async () => {
 
 <template>
   <header
-    class="sticky top-0 h-14 bg-background border-b px-3 flex items-center gap-3 z-50"
+    class="sticky top-0 h-14 bg-background border-b px-3 flex items-center gap-3 z-[45]"
     :class="[isRTL ? 'flex-row-reverse' : 'flex-row']"
   >
     <!-- Left side -->
