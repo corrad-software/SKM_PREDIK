@@ -45,6 +45,26 @@ watch(selectedKoperasi, () => {
   selectedAnakSyarikat.value = null;
 });
 
+// Add this computed property to check if a path exists
+const existingPaths = computed(() => [
+  '/auditor-skm/index-review/kertas-kerja',
+  '/auditor-skm/index-review/kunci-kira-kira',
+  '/auditor-skm/index-review/akaun-pembahagian-keuntungan',
+  '/auditor-skm/index-review/akaun-untung-rugi',
+  '/auditor-skm/index-review/akaun-perdagangan',
+  '/auditor-skm/index-review/dasar-perakaunan',
+  '/auditor-skm/index-review/mpka'
+]);
+
+// Add this method to check if a path exists
+const pathExists = (path) => {
+  if (typeof path === 'function') {
+    // Handle computed paths
+    return true;
+  }
+  return existingPaths.value.some(existingPath => path.startsWith(existingPath));
+};
+
 const documentSections = ref([
   {
     title: 'Indeks Dokumen Koperasi',
@@ -74,23 +94,25 @@ const documentSections = ref([
             path: '/auditor-skm/index-review/akaun-perdagangan',
             isExpanded: false,
             subItems: [
-              { name: 'Pemborong / Peruncitan', path: '/akaun-perdagangan/pemborong-peruncitan' },
-              { name: 'Stesen Minyak', path: '/akaun-perdagangan/stesen-minyak' },
-              { name: 'Ternakan', path: '/akaun-perdagangan/ternakan' },
-              { name: 'Pembangunan Hartanah', path: '/akaun-perdagangan/pembangunan-hartanah' },
-              { name: 'Pertanian', path: '/akaun-perdagangan/pertanian' },
-              { name: 'Lain-Lain Akt. Pengguna', path: '/akaun-perdagangan/lain-lain' }
+              { name: 'Pemborong / Peruncitan', path: '/akaun-perdagangan/pemborong-peruncitan', disabled: true },
+              { name: 'Stesen Minyak', path: '/akaun-perdagangan/stesen-minyak', disabled: true },
+              { name: 'Ternakan', path: '/akaun-perdagangan/ternakan', disabled: true },
+              { name: 'Pembangunan Hartanah', path: '/akaun-perdagangan/pembangunan-hartanah', disabled: true },
+              { name: 'Pertanian', path: '/akaun-perdagangan/pertanian', disabled: true },
+              { name: 'Lain-Lain Akt. Pengguna', path: '/akaun-perdagangan/lain-lain', disabled: true }
             ]
           },
           { 
             name: 'Akaun Perkilangan',
             icon: 'ic:round-factory',
-            path: '/akaun-perkilangan'
+            path: '/akaun-perkilangan',
+            disabled: true
           },
           { 
             name: 'Aliran Tunai',
             icon: 'ic:round-payments',
-            path: '/aliran-tunai'
+            path: '/aliran-tunai',
+            disabled: true
           }
         ]
       },
@@ -100,19 +122,19 @@ const documentSections = ref([
         path: '/auditor-skm/index-review/dasar-perakaunan',
         isExpanded: false,
         subItems: [
-          { name: 'Nota Aset Tetap', icon: 'ic:round-domain', path: '/nota-aset-tetap' },
-          { name: 'Nota Lain-Lain', icon: 'ic:round-notes', path: '/nota-lain' }
+          { name: 'Nota Aset Tetap', icon: 'ic:round-domain', path: '/nota-aset-tetap', disabled: true },
+          { name: 'Nota Lain-Lain', icon: 'ic:round-notes', path: '/nota-lain', disabled: true }
         ]
       },
       { name: 'Memo Panduan Kerja Audit (MPKA)', icon: 'ic:round-work', path: '/auditor-skm/index-review/mpka' },
-      { name: 'Jurnal Pelarasan Audit (JPA)', icon: 'ic:round-edit-note', path: '/jpa' },
-      { name: 'Laporan Juruaudit', icon: 'ic:round-assessment', path: '/laporan-juruaudit' },
-      { name: 'Laporan Pengurusan', icon: 'ic:round-manage-accounts', path: '/laporan-pengurusan' },
-      { name: 'Kuiri', icon: 'ic:round-help', path: '/kuiri' },
-      { name: 'Surat-Surat Pengesahan', icon: 'ic:round-mark-email-read', path: '/surat-pengesahan' },
-      { name: 'Dokumen ISO', icon: 'ic:round-verified', path: '/dokumen-iso' },
-      { name: 'Lain-Lain', icon: 'ic:round-more-horiz', path: '/lain-lain' },
-      { name: 'Data Kewangan', icon: 'ic:round-data-usage', path: '/data-kewangan' }
+      { name: 'Jurnal Pelarasan Audit (JPA)', icon: 'ic:round-edit-note', path: '/jpa', disabled: true },
+      { name: 'Laporan Juruaudit', icon: 'ic:round-assessment', path: '/laporan-juruaudit', disabled: true },
+      { name: 'Laporan Pengurusan', icon: 'ic:round-manage-accounts', path: '/laporan-pengurusan', disabled: true },
+      { name: 'Kuiri', icon: 'ic:round-help', path: '/kuiri', disabled: true },
+      { name: 'Surat-Surat Pengesahan', icon: 'ic:round-mark-email-read', path: '/surat-pengesahan', disabled: true },
+      { name: 'Dokumen ISO', icon: 'ic:round-verified', path: '/dokumen-iso', disabled: true },
+      { name: 'Lain-Lain', icon: 'ic:round-more-horiz', path: '/lain-lain', disabled: true },
+      { name: 'Data Kewangan', icon: 'ic:round-data-usage', path: '/data-kewangan', disabled: true }
     ]
   }
 ]);
@@ -206,6 +228,7 @@ const filteredItems = computed(() => {
                       <Icon :name="item.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
                       <span class="text-gray-700 flex-grow">{{ item.name }}</span>
                       <NuxtLink 
+                        v-show="pathExists(item.path)"
                         :to="item.path"
                         class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                         Buka
@@ -222,6 +245,7 @@ const filteredItems = computed(() => {
                         <Icon :name="item.icon || 'ic:round-folder'" class="w-5 h-5 text-gray-500 mr-3" />
                         <span class="text-gray-700 flex-grow">{{ item.name }}</span>
                         <NuxtLink 
+                          v-show="pathExists(item.path)"
                           :to="item.path"
                           class="ml-4 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                           Buka
@@ -248,6 +272,7 @@ const filteredItems = computed(() => {
                             </template>
                             <template v-else>
                               <NuxtLink 
+                                v-show="pathExists(subItem.path)"
                                 :to="subItem.path"
                                 class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                                 Buka
@@ -265,6 +290,7 @@ const filteredItems = computed(() => {
                               <Icon :name="nestedItem.icon || 'ic:round-description'" class="w-5 h-5 text-gray-500 mr-3" />
                               <span class="text-gray-700 flex-grow">{{ nestedItem.name }}</span>
                               <NuxtLink 
+                                v-show="pathExists(nestedItem.path)"
                                 :to="nestedItem.path"
                                 class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                                 Buka
